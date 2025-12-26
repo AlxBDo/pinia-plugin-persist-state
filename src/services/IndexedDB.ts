@@ -121,7 +121,7 @@ export default class IndexedDB implements ClientStorage {
     }
 
     private handleDeleteRequest(deleteRequest: IDBRequest, key: string): void {
-        deleteRequest.onerror = () => PluginConsole.logError(`IndexedDB - Item "${key}" remove`, deleteRequest.error);
+        deleteRequest.onerror = () => PluginConsole.error(`IndexedDB - Item "${key}" remove`, deleteRequest.error);
     }
 
     private onError(error: any, callback?: Function): void {
@@ -151,7 +151,7 @@ export default class IndexedDB implements ClientStorage {
                     successCallback();
                 }
             } catch (error) {
-                PluginConsole.logError('indexedDB - transaction error', [error]);
+                PluginConsole.error('indexedDB - transaction error', [error]);
             }
         };
 
@@ -223,7 +223,7 @@ export default class IndexedDB implements ClientStorage {
                     });
                 };
 
-                const error = () => PluginConsole.logError('IndexedDB - removeItems', [getAllRequest.error]);
+                const error = () => PluginConsole.error('IndexedDB - removeItems', [getAllRequest.error]);
 
                 this.requestEventsHandler(getAllRequest, { error, success: handleGetAllSuccess });
             }
@@ -279,7 +279,7 @@ export default class IndexedDB implements ClientStorage {
             if (this._objectStore) {
                 const addRequest = this._objectStore.put(item)
                 addRequest.onerror = () =>
-                    PluginConsole.logError('update item', [addRequest.error, item])
+                    PluginConsole.error('update item', [addRequest.error, item])
             }
         }
 

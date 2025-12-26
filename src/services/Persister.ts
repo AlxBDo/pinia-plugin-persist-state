@@ -63,7 +63,7 @@ export default class Persister {
                     }
                 })
             } catch (e) {
-                PluginConsole.logError('Persister - setItem Error', e)
+                PluginConsole.error('Persister - setItem Error', e)
                 this._db.setItem({ storename: key, ...item })
             }
         } else {
