@@ -49,8 +49,21 @@ app.use(pinia)
 When defining a store you can pass `storeOptions` (type: `PersistedStoreOptions`) as part of the `defineStore` options. Example in `src/stores/test.ts`:
 
 ```ts
+// -- using defineAStore
+
+export const useTestStore = defineAStore('testStore', () => {
+  const myString = ref('Hello World')
+  const myStringEncrypted = ref('Sensitive Data')
+
+  return { myString, myStringEncrypted }
+}, {
+  persistedPropertiesToEncrypt: ['myStringEncrypted'],
+  watchMutation: true
+})
+
+// -- or using defineStore
+
 const storeOptions = {
-  persist: true,
   persistedPropertiesToEncrypt: ['myStringEncrypted'],
   watchMutation: true
 }
@@ -63,7 +76,7 @@ export const useTestStore = defineStore('testStore', () => {
 }, { storeOptions })
 ```
 
-If `persist` is `true` the plugin will attempt to persist the store state using the configured persister (localStorage/sessionStorage/IndexedDB).
+If `persist` or `watchMutation` are `true` the plugin will attempt to persist the store state using the configured persister: localStorage, sessionStorage or IndexedDB.
 
 ---
 
@@ -71,9 +84,8 @@ If `persist` is `true` the plugin will attempt to persist the store state using 
 
 Fields available when setting `storeOptions`:
 
-- `dbName?: string` — (Optional) Name of the database/storage to use. Use `'localStorage'` or `'sessionStorage'` for window storage, or any other name to use IndexedDB.
-- `excludedKeys?: string[]` — Keys that should NOT be persisted.
-- `isEncrypted?: boolean` — Internal flag used to reflect whether the persisted state is currently encrypted.
+- `dbName?: string` — (Optional) Name of the database/storage to use to persist the store state (use only if different from the one defined in the plugin). Use `'localStorage'` or `'sessionStorage'` for window storage, or any other name to use IndexedDB.
+- `excludedKeys?: string[]` — List of state properties that should NOT be persisted.
 - `persist?: boolean` — Enable or disable persistence for the store (default: `false`).
 - `persistedPropertiesToEncrypt?: string[]` — List of property names to be encrypted when persisted.
 - `watchMutation?: boolean` — When `true`, plugin watches store mutations and automatically persists changes.
@@ -104,6 +116,7 @@ The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties list
 ## 💡 Notes
 
 - The plugin augments Pinia store definitions using the `pinia-plugin-subscription` helper. It adds `storeOptions` to Pinia's `DefineStoreOptionsBase` type through declaration merging.
+- The $reset method is available for stores augmented by the plugin (also compositionApi store 😁).
 - When using IndexedDB, the persister stores objects with a `storeName` key path.
 
 ---

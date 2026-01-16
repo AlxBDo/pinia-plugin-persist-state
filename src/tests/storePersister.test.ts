@@ -10,43 +10,9 @@ import Crypt from '../services/Crypt'
 // Register the pinia setup for each test (without the plugin integration)
 beforeEachPiniaPlugin()
 
-async function createPersisterForStore(store: ReturnType<typeof useTestStore>) {
-    const persister = new PersisterMock({ name: 'localStorage' })
-    const crypt = new Crypt('HrN2t2nCr6pTkEy20221l2B3dOcPr4j2')
-
-    const options: any = {
-        persister,
-        crypt,
-        watchedStore: new Set<string>(),
-        // simulate the merged store options that the plugin would provide
-        excludedKeys: [],
-        persistedPropertiesToEncrypt: ['myStringEncrypted'],
-        isEncrypted: false,
-        watchMutation: true
-    }
-
-    // instantiate the persister directly to augment the store
-    // @ts-ignore - tests can access internals
-    const instance = new StorePersister(store as any, options, false)
-
-    // if the instance exposed a subscribe function, bind it to the store
-    // (when created by plugin this wiring is done by the plugin system)
-    if ((instance as any).storeSubscribe && typeof store.$subscribe === 'function') {
-        store.$subscribe((instance as any).storeSubscribe)
-    }
-
-    // crypt needs initialization inside the persister when used
-    await crypt.init()
-
-    return { persister, crypt, instance }
-
-}
-
 describe('StorePersister - basic behaviors', () => {
     it('Augments store with persistence methods', async () => {
         const store = useTestStore()
-
-        await createPersisterForStore(store)
 
         expect(typeof (store as any).persistState).toBe('function')
         expect(typeof (store as any).remember).toBe('function')
@@ -57,8 +23,6 @@ describe('StorePersister - basic behaviors', () => {
 
     it('persistState then remember restores persisted values (including encrypted props)', async () => {
         const store = useTestStore()
-
-        const { persister } = await createPersisterForStore(store)
 
         // Prepare values and persist
         store.myString = 'My new string'
@@ -80,7 +44,7 @@ describe('StorePersister - basic behaviors', () => {
     it('stopWatch stops persisting on mutations', async () => {
         const store = useTestStore()
 
-        const { persister } = await createPersisterForStore(store)
+        const persister = new PersisterMock({ name: 'localStorage' })
 
         const spy = vi.spyOn(persister as any, 'setItem')
 
@@ -99,8 +63,6 @@ describe('StorePersister - basic behaviors', () => {
 
     it('removePersistedState deletes persisted data so remember does not revert', async () => {
         const store = useTestStore()
-
-        await createPersisterForStore(store)
 
         store.myString = 'Stored value'
         await (store as any).persistState()

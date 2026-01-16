@@ -28,7 +28,7 @@ export interface PersistedStoreOptions {
 
 export type PluginPersistedStoreOptions = {
     crypt?: Crypt,
-    persister?: Persister
+    persister: Persister
     storeOptions: PersistedStoreOptions,
     watchedStore: Set<string>
 }

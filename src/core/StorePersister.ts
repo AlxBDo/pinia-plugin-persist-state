@@ -1,7 +1,7 @@
 import { toRaw } from "vue"
 import Crypt from "../services/Crypt"
 import Persister from "../services/Persister"
-import { CustomConsole, isEmpty, Store } from "pinia-plugin-subscription"
+import { AnyObject, Console, CustomConsole, isEmpty, Store } from "pinia-plugin-subscription"
 
 import type { Store as PiniaStore, StateTree, SubscriptionCallbackMutation } from "pinia"
 import type { PluginPersistedStoreOptions } from "../types/store"
@@ -33,13 +33,6 @@ export default class StorePersister extends Store {
 
     private _watchedStore: Set<string>
 
-    // Local fallback options when base Store does not expose `options` (read-only getter)
-    private _localOptions?: any
-
-    private get effectiveOptions(): any {
-        return (this as any).options ?? this._localOptions ?? {}
-    }
-
 
     constructor(
         store: PiniaStore,
@@ -50,20 +43,8 @@ export default class StorePersister extends Store {
         super(store, options, debug, console)
         const { crypt, persister, watchedStore } = options
 
-        // Ensure local fallback options are saved (plugin normally sets merged options on the base Store which may be a getter-only property).
-        if (!((this as any).options)) {
-            // Provide reasonable defaults and keep them locally
-            this._localOptions = {
-                excludedKeys: [],
-                persistedPropertiesToEncrypt: [],
-                isEncrypted: false,
-                watchMutation: false,
-                ...(options as any)
-            }
-        }
-
         this._excludedKeys = this.initExcludedKeys()
-        this._persister = persister
+        this.definePersister(persister)
         this._propertiesToEncrypt = new Set<string>(this.getPropertiesToEncrypt())
         this._watchedStore = watchedStore
 
@@ -75,9 +56,9 @@ export default class StorePersister extends Store {
         this.augmentStore()
         this.remember()
 
-        this.debugLog('StorePersister constructor', [
-            this.toBeWatched(), watchedStore, persister, this.options, store, options
-        ])
+        this.debugLog('StorePersister constructor', {
+            toBeWatched: this.toBeWatched(), watchedStore, persister, store, options
+        })
 
         if (this.toBeWatched()) {
             this._watchedStore.add(this.store.$id)
@@ -87,12 +68,10 @@ export default class StorePersister extends Store {
 
 
     augmentStore() {
-        // Augment options - use effectiveOptions which falls back to local options when base Store `options` is not writable
-        const opts = this.effectiveOptions
-        const { isEncrypted, persistedPropertiesToEncrypt, watchMutation } = (typeof opts === 'object' ? opts : {})
-        if (isEncrypted === undefined) { opts.isEncrypted = false }
-        if (persistedPropertiesToEncrypt === undefined) { opts.persistedPropertiesToEncrypt = [] }
-        if (watchMutation === undefined) { opts.watchMutation = false }
+        const { isEncrypted, persistedPropertiesToEncrypt, watchMutation } = this.options
+        if (isEncrypted === undefined) { this.options.isEncrypted = false }
+        if (persistedPropertiesToEncrypt === undefined) { this.options.persistedPropertiesToEncrypt = [] }
+        if (watchMutation === undefined) { this.options.watchMutation = false }
 
         if (!this.stateHas('isLoading')) { this.addToState('isLoading', false) }
 
@@ -118,13 +97,11 @@ export default class StorePersister extends Store {
             const persistedPropertiesToEncrypt = this.getPropertiesToEncrypt()
             const isEncrypted = this.isEncrypted()
 
-            this.debugLog(`cryptState - ${this.store.$id} ${decrypt ? 'decrypt' : 'crypt'}`, [
-                'can',
-                this._propertiesToEncrypt.size > 0
-                && isEncrypted === decrypt && !!Crypt,
+            this.debugLog(`cryptState - ${this.store.$id} ${decrypt ? 'decrypt' : 'crypt'}`, {
+                can: this._propertiesToEncrypt.size > 0 && isEncrypted === decrypt && !!Crypt,
                 Crypt,
                 state
-            ])
+            })
 
             if (this._propertiesToEncrypt.size > 0 && Crypt) {
                 const encryptedState = {} as StateTree
@@ -137,10 +114,7 @@ export default class StorePersister extends Store {
                     }
                 }
 
-                this.debugLog(`cryptState - ${this.store.$id}`, [
-                    'encryptedState',
-                    encryptedState
-                ])
+                this.debugLog(`cryptState - ${this.store.$id}`, { encryptedState })
 
                 if (!isEmpty(encryptedState)) {
                     state = { ...state, ...encryptedState }
@@ -155,12 +129,26 @@ export default class StorePersister extends Store {
         })
     }
 
+    static override customizeStore<Instance extends Store>(store: PiniaStore, options: AnyObject, debug: boolean, console?: Console): Instance | undefined {
+        if (!options.storeOptions?.persist && options.storeOptions?.watchMutation) {
+            options.storeOptions.persist = true
+        }
+
+        return super.customizeStore<Instance>(store, options, debug, console)
+    }
+
+    private definePersister(pluginPersister: Persister) {
+        this._persister = this.options.dbName
+            ? new Persister({ name: this.options.dbName as string, keyPath: 'storeName' })
+            : pluginPersister
+    }
+
     private isEncrypted() {
-        return this.effectiveOptions.isEncrypted
+        return this.options.isEncrypted
     }
 
     private getPropertiesToEncrypt(): string[] {
-        return (this.effectiveOptions?.persistedPropertiesToEncrypt ?? []) as string[]
+        return (this.options?.persistedPropertiesToEncrypt ?? []) as string[]
     }
 
     async getPersistedState(decrypt: boolean = true): Promise<StateTree | undefined> {
@@ -174,11 +162,11 @@ export default class StorePersister extends Store {
                 persistedState = await this.cryptState(persistedState, true)
             }
 
-            this.debugLog(`getPersistedState ${storeName}`, [persistedState, this.state])
+            this.debugLog(`getPersistedState ${storeName}`, { persistedState, state: this.state })
 
             return persistedState
         } catch (e) {
-            console.log('getPersistedState Error', [storeName, e])
+            this.logError('getPersistedState()', { storeName, e })
         }
     }
 
@@ -214,20 +202,20 @@ export default class StorePersister extends Store {
     }
 
     private getWatchMutation() {
-        return this.effectiveOptions.watchMutation
+        return this.options.watchMutation
     }
 
     private initExcludedKeys(): Set<string> {
         return new Set<string>([
             ...notPersistedProperties,
-            ...(this.effectiveOptions.excludedKeys as string[] ?? [])
+            ...(this.options.excludedKeys as string[] ?? [])
         ])
     }
 
     async persist() {
         const state = await this.getStateToPersist()
 
-        this.debugLog(`persist() ${this.store.$id} - stateToPersist:`, state)
+        this.debugLog(`persist() ${this.store.$id} - stateToPersist:`, { state })
 
         if (!isEmpty(state)) {
             (this._persister as Persister).setItem(this.store.$id, state)
@@ -254,12 +242,10 @@ export default class StorePersister extends Store {
     }
 
     private stopWatch() {
-        if (this.effectiveOptions?.watchMutation) {
+        if (this.options?.watchMutation) {
             // if the base Store has writable options, update it, otherwise update local options
             if ((this as any).options) {
                 (this as any).options.watchMutation = false
-            } else {
-                this._localOptions.watchMutation = false
             }
             this._watchedStore.delete(this.store.$id)
         }
@@ -267,8 +253,11 @@ export default class StorePersister extends Store {
 
     private storeSubscription(mutation: SubscriptionCallbackMutation<StateTree>): void {
         this.debugLog(`store.$subscribe ${this.store.$id}`, [
-            mutation.type !== 'patch object', this.getWatchMutation(),
-            mutation, this.state, this.store
+            'mutation type !== patch object: ', mutation.type !== 'patch object',
+            'watchMutation: ', this.getWatchMutation(),
+            'mutation:', mutation,
+            'state:', this.state,
+            'store:', this.store
         ])
 
         if (mutation.type !== 'patch object' && this.getWatchMutation()) {
@@ -292,8 +281,6 @@ export default class StorePersister extends Store {
         if (this.toBeWatched()) {
             if ((this as any).options) {
                 (this as any).options.watchMutation = true
-            } else {
-                this._localOptions.watchMutation = true
             }
             this.storeSubscribe = this.storeSubscription.bind(this)
         }
