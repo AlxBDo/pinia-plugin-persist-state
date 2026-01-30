@@ -78,7 +78,7 @@ export default class StorePersister extends Store {
         // Augment Store
         this.store.persistState = async () => await this.persist()
         this.store.remember = async () => await this.remember()
-        this.store.removePersistedState = () => (this._persister as Persister).removeItem(this.store.$id)
+        this.store.removePersistedState = this.removePersistedState.bind(this)
         this.store.watch = this.watch
         this.store.stopWatch = this.stopWatch
     }
@@ -241,6 +241,10 @@ export default class StorePersister extends Store {
         })
     }
 
+    private removePersistedState() {
+        (this._persister as Persister).removeItem(this.store.$id)
+    }
+
     private stopWatch() {
         if (this.options?.watchMutation) {
             // if the base Store has writable options, update it, otherwise update local options
@@ -252,7 +256,7 @@ export default class StorePersister extends Store {
     }
 
     private storeSubscription(mutation: SubscriptionCallbackMutation<StateTree>): void {
-        this.debugLog(`store.$subscribe ${this.store.$id}`, [
+        this.debugLog(`store.storeSubscription() ${this.store.$id}`, [
             'mutation type !== patch object: ', mutation.type !== 'patch object',
             'watchMutation: ', this.getWatchMutation(),
             'mutation:', mutation,

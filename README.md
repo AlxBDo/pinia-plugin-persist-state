@@ -33,7 +33,7 @@ import { createPersistStatePlugin } from 'persist-pinia-state'
 const app = createApp(App)
 const pinia = createPinia()
 
-// Pass `dbName` (e.g. 'localStorage' or a DB name for IndexedDB)
+// Pass `dbName` (e.g. 'localStorage', 'sessionStorage' or a DB name for IndexedDB)
 // and an optional `cryptKey` to enable encryption support
 pinia.use(createPlugin([
   createPersistStatePlugin('localStorage', 'my-secret-key')
@@ -116,7 +116,7 @@ The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties list
 ## 💡 Notes
 
 - The plugin augments Pinia store definitions using the `pinia-plugin-subscription` helper. It adds `storeOptions` to Pinia's `DefineStoreOptionsBase` type through declaration merging.
-- The $reset method is available for stores augmented by the plugin (also compositionApi store 😁).
+- The $reset method is available for stores augmented by the plugin (also setup store 😁).
 - When using IndexedDB, the persister stores objects with a `storeName` key path.
 
 ---
