@@ -51,7 +51,6 @@ export default class Persister {
 
 
     setItem(key: string, item: any) {
-        console.log('Persister - setItem', [key, item, this._db])
         if (this._db instanceof IndexedDB) {
             try {
                 this._db.getItem(key).then(persistedItem => {

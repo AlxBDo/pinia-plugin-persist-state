@@ -11,7 +11,7 @@ const pinia = createPinia()
 
 pinia.use(createPlugin([
     createPersistStatePlugin('localStorage', 'hsuHuy_HJzoaizls@uz%jsuy-cdqgRDSH')
-], true))
+]))
 
 app.use(pinia)
 

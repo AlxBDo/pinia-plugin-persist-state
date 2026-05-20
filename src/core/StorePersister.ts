@@ -21,8 +21,6 @@ const notPersistedProperties: string[] = [
 
 
 export default class StorePersister extends Store {
-    protected _className: string = 'StorePersister'
-
     protected _crypt?: Crypt
 
     private _excludedKeys: Set<string>
@@ -203,6 +201,10 @@ export default class StorePersister extends Store {
 
     private getWatchMutation() {
         return this.options.watchMutation
+    }
+
+    protected static override hasRequiredKeys(options: AnyObject): boolean {
+        return !!options?.persist || !!options?.watchMutation
     }
 
     private initExcludedKeys(): Set<string> {
