@@ -21,6 +21,8 @@ const notPersistedProperties: string[] = [
 
 
 export default class StorePersister extends Store {
+    protected _className: string = 'StorePersister'
+
     protected _crypt?: Crypt
 
     private _excludedKeys: Set<string>

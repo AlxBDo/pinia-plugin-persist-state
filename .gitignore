@@ -31,5 +31,3 @@ src/App.vue
 src/assets
 src/models
 src/components
-src/stores
-src/utils

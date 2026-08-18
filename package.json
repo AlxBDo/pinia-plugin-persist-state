@@ -1,9 +1,18 @@
 {
-  "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
   "name": "pinia-plugin-persist-state",
   "description": "Pinia plugin for persisting store state",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
+  "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlxBDo/pinia-plugin-persist-state.git"
+  },
+  "homepage": "https://github.com/AlxBDo/pinia-plugin-persist-state",
+  "bugs": {
+    "url": "https://github.com/AlxBDo/pinia-plugin-persist-state/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
@@ -14,8 +23,18 @@
   "main": "./dist/pinia-plugin-persist-state.umd.cjs",
   "types": "./dist/types/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "dev": "vite",
     "build": "vitest && vite build && tsc --emitDeclarationOnly --outDir dist",
@@ -24,18 +43,32 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "pinia-plugin-subscription": "^0.0.2"
+    "pinia-plugin-subscription": "^0.1.1"
+  },
+  "peerDependencies": {
+    "pinia": "^2.0.0 || ^3.0.0",
+    "vue": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@vitest/coverage-v8": "^4.0.15",
     "@vue/tsconfig": "^0.8.1",
-    "pinia": "^3.0.2",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^4.0.16",
-    "vue": "^3.5.24",
-    "vue-tsc": "^3.1.4"
-  }
+    "vue-tsc": "^3.1.4",
+    "pinia": "^3.0.2",
+    "vue": "^3.5.24"
+  },
+  "keywords": [
+    "pinia",
+    "vue",
+    "plugin",
+    "store",
+    "persist",
+    "state",
+    "typescript"
+  ],
+  "sideEffects": false
 }
