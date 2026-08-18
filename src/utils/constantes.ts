@@ -1,0 +1,1 @@
+export const pluginName = 'pinia-plugin-persist-state'
