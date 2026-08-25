@@ -54,7 +54,6 @@ export default class StorePersister extends Store {
         }
 
         this.augmentStore()
-        this.remember()
 
         this.debugLog('StorePersister constructor', {
             toBeWatched: this.toBeWatched(), watchedStore, persister, store, options
@@ -64,6 +63,14 @@ export default class StorePersister extends Store {
             this._watchedStore.add(this.store.$id)
             this.storeSubscribe = this.storeSubscription.bind(this)
         }
+    }
+
+    override hydrate(): Promise<boolean> {
+        if (typeof window === 'undefined') {
+            return Promise.resolve(false)
+        }
+
+        return this.remember()
     }
 
 

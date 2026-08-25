@@ -11,6 +11,7 @@ A small Pinia plugin that adds persistence and optional encryption to your Pinia
 - Per-store options via `storeOptions` when defining a store
 - Augmented store API: `persistState`, `remember`, `removePersistedState`, `watch`, `stopWatch`
 - Simple initialization through `createPersistStatePlugin(dbName?, cryptKey?)`
+- SSR-safe hydration flow: methods are injected immediately on client, persistence restore is executed during hydration lifecycle
 
 ---
 
@@ -28,7 +29,7 @@ Then register the plugin with Pinia in your app entry (see `src/main.ts`):
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createPlugin } from 'pinia-plugin-subscription'
-import { createPersistStatePlugin } from 'persist-pinia-state'
+import { createPersistStatePlugin, PLUGIN_NAME } from 'persist-pinia-state'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -37,9 +38,22 @@ const pinia = createPinia()
 // and an optional `cryptKey` to enable encryption support
 pinia.use(createPlugin([
   createPersistStatePlugin('localStorage', 'my-secret-key')
-], true))
+]))
 
 app.use(pinia)
+```
+
+For Nuxt/SSR projects, prefer `createHydrationPlugin` from `pinia-plugin-subscription` when you need runtime overrides:
+
+```ts
+import { createHydrationPlugin } from 'pinia-plugin-subscription'
+import { createPersistStatePlugin } from 'persist-pinia-state'
+
+pinia.use(createHydrationPlugin([
+  createPersistStatePlugin('localStorage', 'my-secret-key')
+], {
+  runtimeEnvironment: import.meta.client ? 'client' : 'server'
+}))
 ```
 
 ---

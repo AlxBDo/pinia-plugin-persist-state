@@ -1,7 +1,7 @@
 {
   "name": "pinia-plugin-persist-state",
   "description": "Pinia plugin for persisting store state",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.0",
   "type": "module",
   "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "pinia-plugin-subscription": "^0.1.1"
+    "pinia-plugin-subscription": "^0.1.6-beta.1"
   },
   "peerDependencies": {
     "pinia": "^2.0.0 || ^3.0.0",
