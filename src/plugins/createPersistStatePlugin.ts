@@ -19,7 +19,7 @@ function getPluginOptions(dbName?: string, cryptKey?: string) {
     const watchedStore: Set<string> = new Set<string>()
 
     try {
-        if (window) {
+        if (typeof window !== 'undefined') {
             if (!isEmpty(dbName) && dbName) {
                 persister = new Persister({ name: dbName, keyPath: 'storeName' })
             }

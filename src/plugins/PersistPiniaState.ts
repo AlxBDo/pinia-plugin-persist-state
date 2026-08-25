@@ -1,3 +1,4 @@
+import { nextTick } from "vue";
 import StorePersister from "../core/StorePersister";
 import { PluginSubscriber } from "pinia-plugin-subscription";
 import type { PluginSubscriberInterface } from "pinia-plugin-subscription";
@@ -21,6 +22,28 @@ class PeristPiniaState extends PluginSubscriber<StorePersister> {
             StorePersister.customizeStore.bind(StorePersister),
             PluginConsole
         )
+
+        this.execution = {
+            environment: 'client',
+            hydration: 'immediate',
+        }
+
+        this.hydrationScheduler = (run) => {
+            nextTick(() => run())
+        }
+    }
+
+    override hydrate() {
+        if (typeof window === 'undefined') {
+            return
+        }
+
+        this.hydrationScheduler?.(() => {
+            const hydration = this.storeInstance?.hydrate?.()
+            if (hydration && typeof (hydration as Promise<void>).catch === 'function') {
+                ; (hydration as Promise<void>).catch((e: unknown) => this.logError(e))
+            }
+        })
     }
 }
 
