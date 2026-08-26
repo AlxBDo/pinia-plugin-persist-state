@@ -65,9 +65,9 @@ export default class StorePersister extends Store {
         }
     }
 
-    override hydrate(): Promise<boolean> {
+    override hydrate(): Promise<void> {
         if (typeof window === 'undefined') {
-            return Promise.resolve(false)
+            return Promise.resolve()
         }
 
         return this.remember()
@@ -86,8 +86,9 @@ export default class StorePersister extends Store {
         this.store.persistState = async () => await this.persist()
         this.store.remember = async () => await this.remember()
         this.store.removePersistedState = this.removePersistedState.bind(this)
-        this.store.watch = this.watch
-        this.store.stopWatch = this.stopWatch
+        this.store.watch = this.watch.bind(this)
+        this.store.stopWatch = this.stopWatch.bind(this)
+        this.store.hydrate = this.hydrate.bind(this)
     }
 
     private async cryptProperty(crypt: Crypt, value: string, decrypt: boolean = false): Promise<string> {
@@ -237,7 +238,7 @@ export default class StorePersister extends Store {
         return !this._excludedKeys.has(property)
     }
 
-    private async remember() {
+    private async remember(): Promise<void> {
         this.state.isLoading = true
         return new Promise(async (resolve) => {
             let persistedState = await this.getPersistedState()
@@ -248,7 +249,7 @@ export default class StorePersister extends Store {
 
             this.state.isLoading = false
 
-            return resolve(true)
+            return resolve()
         })
     }
 
@@ -259,8 +260,8 @@ export default class StorePersister extends Store {
     private stopWatch() {
         if (this.options?.watchMutation) {
             // if the base Store has writable options, update it, otherwise update local options
-            if ((this as any).options) {
-                (this as any).options.watchMutation = false
+            if (this.options) {
+                this.options.watchMutation = false
             }
             this._watchedStore.delete(this.store.$id)
         }
@@ -294,8 +295,8 @@ export default class StorePersister extends Store {
 
     private watch(): void {
         if (this.toBeWatched()) {
-            if ((this as any).options) {
-                (this as any).options.watchMutation = true
+            if (this.options) {
+                this.options.watchMutation = true
             }
             this.storeSubscribe = this.storeSubscription.bind(this)
         }
