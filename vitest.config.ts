@@ -4,7 +4,25 @@ export default defineConfig({
     test: {
         include: ['src/tests/**/*.test.ts'],
         coverage: {
-            provider: 'v8' // or 'istanbul'
+            enabled: true,
+            provider: 'v8',
+            include: ['src/**/*.ts'],
+            exclude: [
+                'src/App.vue',
+                'src/main.ts',
+                'src/stores/**',
+                'src/testing/**',
+                'src/tests/**',
+                'src/types/**',
+                'src/services/IndexedDB.ts',
+            ],
+            thresholds: {
+                lines: 80,
+                functions: 80,
+                branches: 80,
+                statements: 80,
+            },
+            reporter: ['text', 'html']
         },
     },
 })

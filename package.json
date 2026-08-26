@@ -1,7 +1,7 @@
 {
   "name": "pinia-plugin-persist-state",
   "description": "Pinia plugin for persisting store state",
-  "version": "0.1.1-beta.0",
+  "version": "0.1.1",
   "type": "module",
   "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "pinia-plugin-subscription": "^0.1.6-beta.1"
+    "pinia-plugin-subscription": "^0.1.6"
   },
   "peerDependencies": {
     "pinia": "^2.0.0 || ^3.0.0",
@@ -52,14 +52,15 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.1",
-    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/ui": "^4.1.11",
     "@vue/tsconfig": "^0.8.1",
+    "pinia": "^3.0.2",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^4.0.16",
-    "vue-tsc": "^3.1.4",
-    "pinia": "^3.0.2",
-    "vue": "^3.5.24"
+    "vue": "^3.5.24",
+    "vue-tsc": "^3.1.4"
   },
   "keywords": [
     "pinia",

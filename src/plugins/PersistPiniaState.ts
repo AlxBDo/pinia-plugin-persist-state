@@ -41,7 +41,7 @@ class PeristPiniaState extends PluginSubscriber<StorePersister> {
         this.hydrationScheduler?.(() => {
             const hydration = this.storeInstance?.hydrate?.()
             if (hydration && typeof (hydration as Promise<void>).catch === 'function') {
-                ; (hydration as Promise<void>).catch((e: unknown) => this.logError(e))
+                ; (hydration as Promise<void>).catch((e: unknown) => PluginConsole.error('PersistPiniaState hydration error', e))
             }
         })
     }
