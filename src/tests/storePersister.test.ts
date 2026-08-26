@@ -38,14 +38,14 @@ describe('StorePersister - basic behaviors', () => {
         spySetItem.mockRestore()
     })
 
-    it('hydrate returns false when window is undefined', async () => {
+    it('hydrate returns undefined when window is undefined', async () => {
         const store = useTestStore()
         const originalWindow = (globalThis as any).window
         delete (globalThis as any).window
 
         try {
             const result = await (store as any).hydrate()
-            expect(result).toBe(false)
+            expect(result).toBe(undefined)
         } finally {
             (globalThis as any).window = originalWindow
         }
