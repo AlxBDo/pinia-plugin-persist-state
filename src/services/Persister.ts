@@ -1,7 +1,6 @@
 import WindowStorage from './WindowStorage'
 import { AllowedKeyPath, ClientStorage, StorageItem } from '../types/storage'
 import IndexedDB from './IndexedDB'
-import { PluginConsole } from '../utils/pluginConsole'
 
 export type DbOptions = {
     keyPath?: AllowedKeyPath
@@ -35,38 +34,19 @@ export default class Persister {
         return new IndexedDB(name, { keyPath })
     }
 
-    getItem(itemKey: string): Promise<StorageItem | undefined> {
-        return new Promise((resolve, reject) => {
-            try {
-                return this._db.getItem(itemKey).then(item => resolve(item))
-            } catch (e) {
-                reject(e)
-            }
-        })
+    async getItem(itemKey: string): Promise<StorageItem | undefined> {
+        return this._db.getItem(itemKey)
     }
 
-    removeItem(itemKey: string) {
-        this._db.removeItem(itemKey)
+    async removeItem(itemKey: string): Promise<void> {
+        await this._db.removeItem(itemKey)
     }
 
-
-    setItem(key: string, item: any) {
+    async setItem(key: string, item: StorageItem): Promise<void> {
         if (this._db instanceof IndexedDB) {
-            try {
-                this._db.getItem(key).then(persistedItem => {
-                    if (persistedItem) {
-                        const db = this._db as IndexedDB
-                        db.updateItem(persistedItem)
-                    } else {
-                        this._db.setItem({ storeName: key, ...item })
-                    }
-                })
-            } catch (e) {
-                PluginConsole.error('Persister - setItem Error', e)
-                this._db.setItem({ storename: key, ...item })
-            }
+            await this._db.setItem({ storeName: key, ...(item as object) })
         } else {
-            this._db.setItem(item, key)
+            await this._db.setItem(item, key)
         }
     }
 }

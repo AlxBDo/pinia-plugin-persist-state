@@ -69,33 +69,23 @@ describe('Persister service direct unit tests', () => {
         expect(persister.dbName).toBe('indexedDB')
     })
 
-    it('handles IndexedDB setItem branches', async () => {
+    it('writes IndexedDB items atomically', async () => {
         const persister = new Persister({ name: 'indexedDB' })
 
-        // Mock IndexedDB getItem and setItem / updateItem on _db
-        const mockGetItem = vi.spyOn((persister as any)._db, 'getItem')
-        const mockSetItem = vi.spyOn((persister as any)._db, 'setItem').mockImplementation(() => { })
-        const mockUpdateItem = vi.spyOn((persister as any)._db, 'updateItem').mockImplementation(() => { })
+        const mockSetItem = vi.spyOn((persister as any)._db, 'setItem').mockResolvedValue(undefined)
 
-        // Case 1: Item already exists in IndexedDB -> calls updateItem
-        mockGetItem.mockResolvedValueOnce({ storeName: 'testStore', data: 'existing' })
-        persister.setItem('testStore', { data: 'newVal' })
+        await persister.setItem('testStore', { data: 'newVal' })
+        await persister.setItem('testStore', { data: 'newerVal' })
 
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        expect(mockUpdateItem).toHaveBeenCalledWith({ storeName: 'testStore', data: 'existing' })
+        expect(mockSetItem).toHaveBeenNthCalledWith(1, { storeName: 'testStore', data: 'newVal' })
+        expect(mockSetItem).toHaveBeenNthCalledWith(2, { storeName: 'testStore', data: 'newerVal' })
+    })
 
-        // Case 2: Item does NOT exist in IndexedDB -> calls setItem with { storeName, ...item }
-        mockGetItem.mockResolvedValueOnce(undefined)
-        persister.setItem('testStore2', { data: 'freshVal' })
+    it('propagates IndexedDB write errors', async () => {
+        const persister = new Persister({ name: 'indexedDB' })
+        const error = new Error('IndexedDB error')
+        vi.spyOn((persister as any)._db, 'setItem').mockRejectedValue(error)
 
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        expect(mockSetItem).toHaveBeenCalledWith({ storeName: 'testStore2', data: 'freshVal' })
-
-        // Case 3: getItem throws error -> catch block calls setItem with { storename, ...item }
-        mockGetItem.mockImplementationOnce(() => { throw new Error('IndexedDB error') })
-        persister.setItem('testStore3', { data: 'errVal' })
-
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        expect(mockSetItem).toHaveBeenCalledWith({ storename: 'testStore3', data: 'errVal' })
+        await expect(persister.setItem('testStore', { data: 'newVal' })).rejects.toThrow(error)
     })
 })

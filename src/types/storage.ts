@@ -1,9 +1,9 @@
 export interface ClientStorage {
-    clear(): void;
+    clear(): Promise<void>;
     getItem(key: string | number): Promise<StorageItem | undefined>;
-    removeItem(key: string | number): void;
-    removeItems(excludedItems?: any[]): void;
-    setItem(item: StorageItem, keyOrIndex?: string | string[]): void;
+    removeItem(key: string | number): Promise<void>;
+    removeItems(excludedItems?: any[]): Promise<void>;
+    setItem(item: StorageItem, keyOrIndex?: string | string[]): Promise<void>;
 }
 
 export type AllowedKeyPath = 'storeName' | 'id'

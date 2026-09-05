@@ -1,49 +1,62 @@
-import { describe, expect, it } from 'vitest'
+import 'fake-indexeddb/auto'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { IndexedDB } from '../testing/mocks/indexedDb'
+import IndexedDB from '../services/IndexedDB'
 
-describe('Persister using localStorage : persist all types of data', () => {
-    const indexedDb = new IndexedDB()
+let databaseNumber = 0
 
-    it('Persist item using number key', async () => {
-        const item = 'My string test'
-        indexedDb.setItem(item, '2')
+function createIndexedDB(): IndexedDB {
+    databaseNumber++
+    return new IndexedDB(`persist-test-${databaseNumber}`, { keyPath: 'storeName' })
+}
 
-        const persistedStr = await indexedDb.getItem(2)
-
-        expect(persistedStr).toStrictEqual(item)
+describe('IndexedDB', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks()
     })
 
-    it('Remove persisted data', async () => {
-        const objItem = { key: "my item" }
-        indexedDb.setItem(objItem, 'objItem')
-        const arrayItem = ['my array']
-        indexedDb.setItem(arrayItem, 'arrayItem')
+    it('updates and reads an item in its named database', async () => {
+        const indexedDb = createIndexedDB()
 
-        indexedDb.removeItems(['objItem', 'arrayItem'])
+        await indexedDb.setItem({ storeName: 'testStore', value: 'first' })
+        await indexedDb.setItem({ storeName: 'testStore', value: 'latest' })
 
-        expect(await indexedDb.getItem(2)).toBeUndefined()
-        expect(await indexedDb.getItem('objItem')).toStrictEqual(objItem)
-        expect(await indexedDb.getItem('arrayItem')).toStrictEqual(arrayItem)
-
-        indexedDb.removeItems()
-
-        expect(await indexedDb.getItem('objItem')).toBeUndefined()
-        expect(await indexedDb.getItem('arrayItem')).toBeUndefined()
+        await expect(indexedDb.getItem('testStore')).resolves.toEqual({ storeName: 'testStore', value: 'latest' })
     })
 
-    it('Clear database', async () => {
-        const objItem = { key: "object item" }
-        indexedDb.setItem(objItem, 'objItem')
-        const arrayItem = ['array item']
-        indexedDb.setItem(arrayItem, 'arrayItem')
-        const strItem = 'My string test'
-        indexedDb.setItem(strItem, 'strItem')
+    it('reuses one database connection for successive operations', async () => {
+        const open = vi.spyOn(globalThis.indexedDB, 'open')
+        const indexedDb = createIndexedDB()
 
-        indexedDb.clear()
+        await indexedDb.setItem({ storeName: 'testStore', value: 'stored' })
+        await indexedDb.getItem('testStore')
+        await indexedDb.removeItem('testStore')
 
-        expect(await indexedDb.getItem('strItem')).toBeUndefined()
-        expect(await indexedDb.getItem('objItem')).toBeUndefined()
-        expect(await indexedDb.getItem('arrayItem')).toBeUndefined()
+        expect(open).toHaveBeenCalledTimes(1)
+    })
+
+    it('removes all items except excluded keys', async () => {
+        const indexedDb = createIndexedDB()
+        await indexedDb.setItem({ storeName: 'keep', value: 'kept' })
+        await indexedDb.setItem({ storeName: 'remove', value: 'removed' })
+
+        await indexedDb.removeItems(['keep'])
+
+        await expect(indexedDb.getItem('keep')).resolves.toEqual({ storeName: 'keep', value: 'kept' })
+        await expect(indexedDb.getItem('remove')).resolves.toBeUndefined()
+    })
+
+    it('keeps data isolated between named databases', async () => {
+        const first = createIndexedDB()
+        const second = createIndexedDB()
+        await first.setItem({ storeName: 'testStore', value: 'first' })
+
+        await expect(second.getItem('testStore')).resolves.toBeUndefined()
+    })
+
+    it('rejects invalid writes instead of hiding transaction errors', async () => {
+        const indexedDb = createIndexedDB()
+
+        await expect(indexedDb.setItem('missing-key-path')).rejects.toThrow()
     })
 })

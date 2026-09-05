@@ -103,6 +103,7 @@ Fields available when setting `storeOptions`:
 - `persist?: boolean` — Enable or disable persistence for the store (default: `false`).
 - `persistedPropertiesToEncrypt?: string[]` — List of property names to be encrypted when persisted.
 - `watchMutation?: boolean` — When `true`, plugin watches store mutations and automatically persists changes.
+- `debounceMs?: number` — Delay in milliseconds before an automatic persistence is written. Defaults to `200`; use `0` to persist each mutation immediately.
 
 ---
 
@@ -111,8 +112,9 @@ Fields available when setting `storeOptions`:
 When the plugin is active stores gain the following methods (see `PersistedStore` interface):
 
 - `persistState(): Promise<void>` — Immediately persist the current store state (ignores empty values and excluded keys).
+- `flushPersistedState(): Promise<void>` — Cancels a pending automatic persistence and immediately persists the current store state.
 - `remember(): Promise<void>` — Load persisted state and apply it to the store (used on plugin init).
-- `removePersistedState(): void` — Delete the persisted entry for this store.
+- `removePersistedState(): Promise<void>` — Delete the persisted entry for this store after any running write completes.
 - `watch(): void` — Start watching for mutations (sets `watchMutation = true`).
 - `stopWatch(): void` — Stop auto-persisting on mutations (sets `watchMutation = false`).
 

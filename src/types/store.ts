@@ -8,8 +8,9 @@ export interface PersistedState {
 
 export interface PersistedStore {
     persistState: () => Promise<void>
+    flushPersistedState: () => Promise<void>
     remember: () => Promise<void>
-    removePersistedState: () => void
+    removePersistedState: () => Promise<void>
     stateIsEmpty?: () => boolean
     stopWatch: () => void
     watch: () => void
@@ -17,6 +18,7 @@ export interface PersistedStore {
 
 export interface PersistedStoreOptions {
     dbName?: string
+    debounceMs?: number
     excludedKeys?: string[]
     isEncrypted?: boolean
     persist?: boolean

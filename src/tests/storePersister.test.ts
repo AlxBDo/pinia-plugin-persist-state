@@ -6,6 +6,7 @@ import { beforeEachPiniaPlugin } from './utils/beforeEach'
 import StorePersister from '../core/StorePersister'
 import PersisterMock from '../testing/mocks/persister'
 import Crypt from '../services/Crypt'
+import PersistPiniaState from '../plugins/PersistPiniaState'
 
 // Register the pinia setup for each test (without the plugin integration)
 beforeEachPiniaPlugin()
@@ -114,12 +115,36 @@ describe('StorePersister - basic behaviors', () => {
 
         // Change and then remove persisted state
         store.myString = 'Changed locally'
-            ; (store as any).removePersistedState()
+        await (store as any).removePersistedState()
 
         // Remember should not overwrite local change because persisted item was removed
         await (store as any).remember()
 
         expect(store.myString).toBe('Changed locally')
+    })
+
+    it('debounces rapid mutation persistence', async () => {
+        vi.useFakeTimers()
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+
+        try {
+            expect(storePersister).toBeDefined()
+            storePersister.options.watchMutation = true
+            const persist = vi.spyOn(storePersister, 'persist').mockResolvedValue(undefined)
+            const persistedStore = (storePersister as any).store
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+
+            await vi.advanceTimersByTimeAsync(199)
+            expect(persist).not.toHaveBeenCalled()
+
+            await vi.advanceTimersByTimeAsync(1)
+            expect(persist).toHaveBeenCalledTimes(1)
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
     it('handles storeSubscription mutation execution and mutationCallback', async () => {

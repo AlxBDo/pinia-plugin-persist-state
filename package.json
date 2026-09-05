@@ -1,7 +1,7 @@
 {
   "name": "pinia-plugin-persist-state",
   "description": "Pinia plugin for persisting store state",
-  "version": "0.1.1",
+  "version": "0.1.2-beta.0",
   "type": "module",
   "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
   "license": "MIT",
@@ -16,11 +16,10 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/pinia-plugin-persist-state.js",
-      "require": "./dist/pinia-plugin-persist-state.umd.cjs"
+      "import": "./dist/pinia-plugin-persist-state.js"
     }
   },
-  "main": "./dist/pinia-plugin-persist-state.umd.cjs",
+  "main": "./dist/pinia-plugin-persist-state.js",
   "types": "./dist/types/index.d.ts",
   "files": [
     "dist",
@@ -43,7 +42,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "pinia-plugin-subscription": "^0.1.6"
+    "pinia-plugin-subscription": "^0.1.7"
   },
   "peerDependencies": {
     "pinia": "^2.0.0 || ^3.0.0",
@@ -55,6 +54,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "@vitest/ui": "^4.1.11",
     "@vue/tsconfig": "^0.8.1",
+    "fake-indexeddb": "^6.2.5",
     "pinia": "^3.0.2",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
@@ -69,7 +69,8 @@
     "store",
     "persist",
     "state",
-    "typescript"
+    "typescript",
+    "pinia-plugin-subscription"
   ],
   "sideEffects": false
 }

@@ -8,7 +8,7 @@ export default class WindowStorage implements ClientStorage {
         this._storage = storageType === "localStorage" ? localStorage : sessionStorage;
     }
 
-    public clear(): void {
+    public async clear(): Promise<void> {
         this._storage.clear();
     }
 
@@ -20,11 +20,11 @@ export default class WindowStorage implements ClientStorage {
         })
     }
 
-    public removeItem(key: string | number): void {
+    public async removeItem(key: string | number): Promise<void> {
         this._storage.removeItem(key.toString());
     }
 
-    public removeItems(excludedItems?: any[]): void {
+    public async removeItems(excludedItems?: any[]): Promise<void> {
         for (let i = 0; i < this._storage.length; i++) {
             const key = this._storage.key(i);
             if (key && (!excludedItems || !excludedItems.includes(key))) {
@@ -33,7 +33,7 @@ export default class WindowStorage implements ClientStorage {
         }
     }
 
-    public setItem(item: StorageItem, key: string): void {
+    public async setItem(item: StorageItem, key: string): Promise<void> {
         this._storage.setItem(key, JSON.stringify(item));
     }
 }

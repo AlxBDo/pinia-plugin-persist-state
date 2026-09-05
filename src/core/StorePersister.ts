@@ -19,6 +19,7 @@ const notPersistedProperties: string[] = [
     'version'
 ]
 
+const DEFAULT_DEBOUNCE_MS = 200
 
 export default class StorePersister extends Store {
     protected _className: string = 'StorePersister'
@@ -30,6 +31,12 @@ export default class StorePersister extends Store {
     protected _persister?: Persister
 
     private _propertiesToEncrypt: Set<string>
+
+    private _persistenceVersion = 0
+
+    private _persistTimer?: ReturnType<typeof setTimeout>
+
+    private _writeQueue: Promise<void> = Promise.resolve()
 
     private _watchedStore: Set<string>
 
@@ -84,6 +91,7 @@ export default class StorePersister extends Store {
 
         // Augment Store
         this.store.persistState = async () => await this.persist()
+        this.store.flushPersistedState = async () => await this.flushPersistedState()
         this.store.remember = async () => await this.remember()
         this.store.removePersistedState = this.removePersistedState.bind(this)
         this.store.watch = this.watch.bind(this)
@@ -213,6 +221,10 @@ export default class StorePersister extends Store {
         return this.options.watchMutation
     }
 
+    private getDebounceMs(): number {
+        return Math.max(0, (this.options.debounceMs ?? DEFAULT_DEBOUNCE_MS) as number)
+    }
+
     protected static override hasRequiredKeys(options: AnyObject): boolean {
         return !!options?.persist || !!options?.watchMutation
     }
@@ -224,13 +236,23 @@ export default class StorePersister extends Store {
         ])
     }
 
-    async persist() {
+    async persist(): Promise<void> {
+        const persistenceVersion = ++this._persistenceVersion
         const state = await this.getStateToPersist()
 
         this.debugLog(`persist() ${this.store.$id} - stateToPersist:`, { state })
 
         if (!isEmpty(state)) {
-            (this._persister as Persister).setItem(this.store.$id, state)
+            const write = this._writeQueue.then(async () => {
+                if (persistenceVersion !== this._persistenceVersion) {
+                    return
+                }
+
+                await (this._persister as Persister).setItem(this.store.$id, state)
+            })
+
+            this._writeQueue = write.catch(() => undefined)
+            await write
         }
     }
 
@@ -253,8 +275,16 @@ export default class StorePersister extends Store {
         })
     }
 
-    private removePersistedState() {
-        (this._persister as Persister).removeItem(this.store.$id)
+    private async removePersistedState(): Promise<void> {
+        this.cancelScheduledPersist()
+        ++this._persistenceVersion
+
+        const removal = this._writeQueue.then(async () => {
+            await (this._persister as Persister).removeItem(this.store.$id)
+        })
+
+        this._writeQueue = removal.catch(() => undefined)
+        await removal
     }
 
     private stopWatch() {
@@ -277,12 +307,31 @@ export default class StorePersister extends Store {
         ])
 
         if (mutation.type !== 'patch object' && this.getWatchMutation()) {
-            this.persist().then(() => {
-                if (this.store.mutationCallback) {
-                    this.store.mutationCallback(this.state, mutation)
-                }
-            })
+            this.schedulePersist(mutation)
         }
+    }
+
+    private cancelScheduledPersist(): void {
+        if (this._persistTimer) {
+            clearTimeout(this._persistTimer)
+            this._persistTimer = undefined
+        }
+    }
+
+    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): void {
+        this.cancelScheduledPersist()
+
+        this._persistTimer = setTimeout(() => {
+            this._persistTimer = undefined
+            this.persist()
+                .then(() => this.store.mutationCallback?.(this.state, mutation))
+                .catch((error: unknown) => this.logError('persist()', { error, storeName: this.store.$id }))
+        }, this.getDebounceMs())
+    }
+
+    private async flushPersistedState(): Promise<void> {
+        this.cancelScheduledPersist()
+        await this.persist()
     }
 
     toBeCrypted(): boolean {
