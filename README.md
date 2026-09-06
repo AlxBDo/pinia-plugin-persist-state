@@ -4,7 +4,7 @@ A small Pinia plugin that adds persistence and optional encryption to your Pinia
 
 ---
 
-## 🔧 Features
+## Features
 
 - Persist store state to LocalStorage, SessionStorage or IndexedDB
 - Selective encryption for specific properties using Web Crypto (AES-GCM)
@@ -15,7 +15,7 @@ A small Pinia plugin that adds persistence and optional encryption to your Pinia
 
 ---
 
-## ⚙️ Installation
+## Installation
 
 Install the package (example):
 
@@ -61,7 +61,7 @@ pinia.use(createHydrationPlugin([
 
 ---
 
-## 📚 Usage
+## Usage
 
 When defining a store you can pass `storeOptions` (type: `PersistedStoreOptions`) as part of the `defineStore` options. Example in `src/stores/test.ts`:
 
@@ -99,7 +99,7 @@ If `persist` or `watchMutation` are `true` the plugin will attempt to persist th
 
 ---
 
-## 🔣 PersistedStoreOptions
+## PersistedStoreOptions
 
 Fields available when setting `storeOptions`:
 
@@ -119,7 +119,7 @@ Fields available when setting `storeOptions`:
 
 ---
 
-## 🧰 Augmented Store API
+## Augmented Store API
 
 When the plugin is active stores gain the following methods (see `PersistedStore` interface):
 
@@ -134,7 +134,7 @@ Note: encrypted properties are automatically decrypted when remembered (if a cry
 
 ---
 
-## 🔐 Encryption
+## Encryption
 
 Optionally supply a `cryptKey` when creating the plugin, e.g. `createPersistStatePlugin({ storage: 'localStorage', cryptKey: 'my-secret' })`.
 The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties listed in `persistedPropertiesToEncrypt` on each store. Only the specified properties will be encrypted. New encrypted values use a versioned `v1:salt:iv:ciphertext` format with a random salt and IV for every value; records in the previous `iv:ciphertext` format remain readable.
@@ -143,7 +143,7 @@ The storage adapter remains responsible for serializing the persisted record: Wi
 
 --- 
 
-## 💡 Notes
+## Notes
 
 - The plugin augments Pinia store definitions using the `pinia-plugin-subscription` helper. It adds `storeOptions` to Pinia's `DefineStoreOptionsBase` type through declaration merging.
 - The $reset method is available for stores augmented by the plugin (also setup store 😁).
@@ -151,6 +151,6 @@ The storage adapter remains responsible for serializing the persisted record: Wi
 
 ---
 
-## 📜 License
+## License
 
 MIT
