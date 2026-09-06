@@ -87,6 +87,48 @@ describe('StorePersister - basic behaviors', () => {
         expect(store.myStringEncrypted).toBe('Sensitive Data')
     })
 
+    it('uses persistenceKey instead of the Pinia store id', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        storePersister.options.persistenceKey = 'lists'
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.any(Object))
+    })
+
+    it('wraps persisted state with cache metadata only when cache is configured', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        storePersister.options.cache = { version: 2 }
+        storePersister.options.persistenceKey = 'lists'
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.objectContaining({
+            state: expect.any(Object),
+            metadata: expect.objectContaining({ cachedAt: expect.any(Number), version: 2 })
+        }))
+    })
+
+    it('ignores an expired cache record when configured', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        storePersister.options.cache = { maxAge: 1, onExpired: 'ignore' }
+        storePersister.options.persistenceKey = 'lists'
+        vi.spyOn(persister, 'getItem').mockResolvedValue({
+            state: { myString: 'expired value' },
+            metadata: { cachedAt: Date.now() - 2 }
+        })
+
+        await expect(storePersister.getPersistedState()).resolves.toBeUndefined()
+    })
+
     it('stopWatch stops persisting on mutations', async () => {
         const store = useTestStore()
 

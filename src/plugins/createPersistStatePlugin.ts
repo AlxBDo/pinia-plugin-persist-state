@@ -4,35 +4,68 @@ import Persister from "../services/Persister";
 import PersistPiniaState from "./PersistPiniaState";
 import { PluginSubscriberInterface } from "pinia-plugin-subscription";
 import { PersistedStore } from "../types";
-import { PersistedStoreOptions } from "../types/store";
+import { PersistedStoreOptions, PersistStatePluginOptions, PersistStorage } from "../types/store";
 
+const WINDOW_STORAGES: PersistStorage[] = ['localStorage', 'sessionStorage']
 
-export function createPersistStatePlugin(dbName?: string, cryptKey?: string): PluginSubscriberInterface {
-    PersistPiniaState.pluginOptions = getPluginOptions(dbName, cryptKey)
+export function createPersistStatePlugin(options: PersistStatePluginOptions): PluginSubscriberInterface
+export function createPersistStatePlugin(storageOrDatabaseName?: string, cryptKey?: string): PluginSubscriberInterface
+export function createPersistStatePlugin(
+    optionsOrStorage?: PersistStatePluginOptions | string,
+    legacyCryptKey?: string
+): PluginSubscriberInterface {
+    const options = normalizePluginOptions(optionsOrStorage, legacyCryptKey)
+    PersistPiniaState.pluginOptions = getPluginOptions(options)
 
     return PersistPiniaState;
 }
 
-function getPluginOptions(dbName?: string, cryptKey?: string) {
+function normalizePluginOptions(
+    optionsOrStorage?: PersistStatePluginOptions | string,
+    cryptKey?: string
+): PersistStatePluginOptions | undefined {
+    if (typeof optionsOrStorage !== 'string') {
+        return optionsOrStorage
+    }
+
+    if (WINDOW_STORAGES.includes(optionsOrStorage as PersistStorage)) {
+        return { storage: optionsOrStorage as PersistStorage, cryptKey }
+    }
+
+    return {
+        storage: 'indexedDB',
+        databaseName: optionsOrStorage,
+        objectStoreName: 'persistedStore',
+        cryptKey
+    }
+}
+
+function getPluginOptions(options?: PersistStatePluginOptions) {
     let persister: Persister | undefined
     let crypt: Crypt | undefined
     const watchedStore: Set<string> = new Set<string>()
 
     try {
         if (typeof window !== 'undefined') {
-            if (!isEmpty(dbName) && dbName) {
-                persister = new Persister({ name: dbName, keyPath: 'storeName' })
+            if (options && !isEmpty(options.storage)) {
+                persister = new Persister({
+                    name: options.databaseName ?? options.storage,
+                    storage: options.storage,
+                    databaseName: options.databaseName,
+                    objectStoreName: options.objectStoreName,
+                    keyPath: 'storeName'
+                })
             }
 
-            if (cryptKey) {
-                crypt = new Crypt(cryptKey)
+            if (options?.cryptKey) {
+                crypt = new Crypt(options.cryptKey)
             }
 
-            return { persister, crypt, watchedStore }
+            return { persister, crypt, storageOptions: options, watchedStore }
         }
     } catch (e) { }
 
-    return { persister, crypt, watchedStore }
+    return { persister, crypt, storageOptions: options, watchedStore }
 }
 
 declare module 'pinia' {

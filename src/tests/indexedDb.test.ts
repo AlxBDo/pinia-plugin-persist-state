@@ -7,7 +7,8 @@ let databaseNumber = 0
 
 function createIndexedDB(): IndexedDB {
     databaseNumber++
-    return new IndexedDB(`persist-test-${databaseNumber}`, { keyPath: 'storeName' })
+    const databaseName = `persist-test-${databaseNumber}`
+    return new IndexedDB(databaseName, databaseName, { keyPath: 'storeName' })
 }
 
 describe('IndexedDB', () => {
@@ -58,5 +59,14 @@ describe('IndexedDB', () => {
         const indexedDb = createIndexedDB()
 
         await expect(indexedDb.setItem('missing-key-path')).rejects.toThrow()
+    })
+
+    it('supports autoIncrement object stores', async () => {
+        databaseNumber++
+        const databaseName = `persist-auto-increment-${databaseNumber}`
+        const indexedDb = new IndexedDB(databaseName, databaseName, { autoIncrement: true })
+
+        await indexedDb.setItem('generated-key-value')
+        await expect(indexedDb.getItem(1)).resolves.toBe('generated-key-value')
     })
 })

@@ -1,10 +1,8 @@
 import type { ClientStorage, StorageItem } from "../types/storage"
 
-const DEFAULT_OBJECT_STORE_NAME = 'persistedState'
-
-type IndexedDBOptions = {
+interface ObjectStoreCreationOptions {
+    autoIncrement?: boolean
     keyPath?: string
-    objectStoreName?: string
 }
 
 type ObjectItemKey = string | number
@@ -12,15 +10,14 @@ type ObjectItemKey = string | number
 export default class IndexedDB implements ClientStorage {
     private _database?: IDBDatabase
     private _databasePromise?: Promise<IDBDatabase>
-    private _keyPath?: string
-    private _objectStoreName: string
+    private _objectStoreOptions: ObjectStoreCreationOptions
 
     constructor(
         private _databaseName: string,
-        options: IndexedDBOptions = {}
+        private _objectStoreName: string,
+        objectStoreCreationOptions: ObjectStoreCreationOptions = {}
     ) {
-        this._keyPath = options.keyPath
-        this._objectStoreName = options.objectStoreName ?? DEFAULT_OBJECT_STORE_NAME
+        this._objectStoreOptions = objectStoreCreationOptions
     }
 
     public async clear(): Promise<void> {
@@ -50,7 +47,7 @@ export default class IndexedDB implements ClientStorage {
 
     public async setItem(item: StorageItem, key?: string): Promise<void> {
         await this.runTransaction('readwrite', (store) =>
-            this._keyPath ? store.put(item) : store.put(item, key)
+            store.keyPath === null ? store.put(item, key) : store.put(item)
         )
     }
 
@@ -71,7 +68,7 @@ export default class IndexedDB implements ClientStorage {
             request.onerror = () => reject(request.error)
             request.onupgradeneeded = () => {
                 if (!request.result.objectStoreNames.contains(this._objectStoreName)) {
-                    request.result.createObjectStore(this._objectStoreName, { keyPath: this._keyPath })
+                    request.result.createObjectStore(this._objectStoreName, this._objectStoreOptions)
                 }
             }
             request.onsuccess = () => {
@@ -91,7 +88,8 @@ export default class IndexedDB implements ClientStorage {
                 }
 
                 database.close()
-                this.openDatabase(database.version + 1).then(resolve, reject)
+                this._databasePromise = this.openDatabase(database.version + 1)
+                this._databasePromise.then(resolve, reject)
             }
         })
     }

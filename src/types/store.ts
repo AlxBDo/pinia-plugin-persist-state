@@ -16,13 +16,31 @@ export interface PersistedStore {
     watch: () => void
 }
 
+export type PersistStorage = 'indexedDB' | 'localStorage' | 'sessionStorage'
+
+export interface PersistStatePluginOptions {
+    storage: PersistStorage
+    databaseName?: string
+    objectStoreName?: string
+    cryptKey?: string
+}
+
+export interface PersistedCacheOptions {
+    maxAge?: number
+    onExpired?: 'ignore' | 'remove' | 'restore'
+    onVersionMismatch?: 'ignore' | 'remove' | 'restore'
+    version?: number
+}
+
 export interface PersistedStoreOptions {
-    dbName?: string
+    cache?: PersistedCacheOptions
     debounceMs?: number
     excludedKeys?: string[]
     isEncrypted?: boolean
     persist?: boolean
+    persistenceKey?: string
     persistedPropertiesToEncrypt?: string[]
+    storage?: PersistStorage
     watchMutation?: boolean
 }
 
@@ -30,6 +48,7 @@ export interface PersistedStoreOptions {
 export type PluginPersistedStoreOptions = {
     crypt?: Crypt,
     persister: Persister
+    storageOptions?: PersistStatePluginOptions
     storeOptions: PersistedStoreOptions,
     watchedStore: Set<string>
 }

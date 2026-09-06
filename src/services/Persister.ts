@@ -1,10 +1,14 @@
 import WindowStorage from './WindowStorage'
 import { AllowedKeyPath, ClientStorage, StorageItem } from '../types/storage'
+import type { PersistStorage } from '../types/store'
 import IndexedDB from './IndexedDB'
 
 export type DbOptions = {
+    databaseName?: string
     keyPath?: AllowedKeyPath
     name: string
+    objectStoreName?: string
+    storage?: PersistStorage
 }
 
 export default class Persister {
@@ -25,13 +29,14 @@ export default class Persister {
     }
 
     defineDb(): ClientStorage {
-        const { keyPath, name } = this._db_options
+        const { databaseName, keyPath, name, objectStoreName, storage } = this._db_options
+        const storageName = storage ?? (name === 'localStorage' || name === 'sessionStorage' ? name : 'indexedDB')
 
-        if (name === 'localStorage' || name === 'sessionStorage') {
-            return new WindowStorage(name)
+        if (storageName === 'localStorage' || storageName === 'sessionStorage') {
+            return new WindowStorage(storageName)
         }
 
-        return new IndexedDB(name, { keyPath })
+        return new IndexedDB(databaseName ?? name, objectStoreName ?? 'persistedStore', { keyPath })
     }
 
     async getItem(itemKey: string): Promise<StorageItem | undefined> {

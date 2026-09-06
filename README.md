@@ -10,7 +10,7 @@ A small Pinia plugin that adds persistence and optional encryption to your Pinia
 - Selective encryption for specific properties using Web Crypto (AES-GCM)
 - Per-store options via `storeOptions` when defining a store
 - Augmented store API: `persistState`, `remember`, `removePersistedState`, `watch`, `stopWatch`
-- Simple initialization through `createPersistStatePlugin(dbName?, cryptKey?)`
+- Explicit configuration of the persistence backend and IndexedDB storage
 - SSR-safe hydration flow: methods are injected immediately on client, persistence restore is executed during hydration lifecycle
 
 ---
@@ -34,10 +34,13 @@ import { createPersistStatePlugin, PLUGIN_NAME } from 'persist-pinia-state'
 const app = createApp(App)
 const pinia = createPinia()
 
-// Pass `dbName` (e.g. 'localStorage', 'sessionStorage' or a DB name for IndexedDB)
-// and an optional `cryptKey` to enable encryption support
 pinia.use(createPlugin([
-  createPersistStatePlugin('localStorage', 'my-secret-key')
+  createPersistStatePlugin({
+    storage: 'indexedDB',
+    databaseName: 'my-application',
+    objectStoreName: 'persistedStore',
+    cryptKey: 'my-secret-key'
+  })
 ]))
 
 app.use(pinia)
@@ -50,7 +53,7 @@ import { createHydrationPlugin } from 'pinia-plugin-subscription'
 import { createPersistStatePlugin } from 'persist-pinia-state'
 
 pinia.use(createHydrationPlugin([
-  createPersistStatePlugin('localStorage', 'my-secret-key')
+  createPersistStatePlugin({ storage: 'localStorage', cryptKey: 'my-secret-key' })
 ], {
   runtimeEnvironment: import.meta.client ? 'client' : 'server'
 }))
@@ -92,18 +95,24 @@ export const useTestStore = defineStore('testStore', () => {
 
 If `persist` or `watchMutation` are `true` the plugin will attempt to persist the store state using the configured persister: localStorage, sessionStorage or IndexedDB.
 
+`createPersistStatePlugin(storageOrDatabaseName?, cryptKey?)` remains supported for compatibility. A value of `'localStorage'` or `'sessionStorage'` selects that storage; any other string is interpreted as an IndexedDB database name and uses the default `persistedStore` object store.
+
 ---
 
 ## 🔣 PersistedStoreOptions
 
 Fields available when setting `storeOptions`:
 
-- `dbName?: string` — (Optional) Name of the database/storage to use to persist the store state (use only if different from the one defined in the plugin). Use `'localStorage'` or `'sessionStorage'` for window storage, or any other name to use IndexedDB.
+- `storage?: 'localStorage' | 'sessionStorage' | 'indexedDB'` — Optional backend override for this store. IndexedDB settings remain configured at plugin level.
+- `persistenceKey?: string` — Record key used for this store. Defaults to the Pinia `$id` and is useful for stable, readable or parameterized keys.
+- `cache?: CacheOptions` — Opt-in cache metadata and restore policy. Without it, the state is persisted in the historical raw format.
 - `excludedKeys?: string[]` — List of state properties that should NOT be persisted.
 - `persist?: boolean` — Enable or disable persistence for the store (default: `false`).
 - `persistedPropertiesToEncrypt?: string[]` — List of property names to be encrypted when persisted.
 - `watchMutation?: boolean` — When `true`, plugin watches store mutations and automatically persists changes.
 - `debounceMs?: number` — Delay in milliseconds before an automatic persistence is written. Defaults to `200`; use `0` to persist each mutation immediately.
+
+`CacheOptions` supports `maxAge?: number`, `version?: number`, `onExpired?: 'ignore' | 'remove' | 'restore'`, and `onVersionMismatch?: 'ignore' | 'remove' | 'restore'`. Cache metadata is written only when `cache` is configured.
 
 ---
 
@@ -124,7 +133,7 @@ Note: encrypted properties are automatically decrypted when remembered (if a cry
 
 ## 🔐 Encryption
 
-Optionally supply a `cryptKey` when creating the plugin, e.g. `createPersistStatePlugin(undefined, 'my-secret')`.
+Optionally supply a `cryptKey` when creating the plugin, e.g. `createPersistStatePlugin({ storage: 'localStorage', cryptKey: 'my-secret' })`.
 The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties listed in `persistedPropertiesToEncrypt` on each store. Only the specified properties will be encrypted.
 
 --- 
@@ -133,7 +142,7 @@ The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties list
 
 - The plugin augments Pinia store definitions using the `pinia-plugin-subscription` helper. It adds `storeOptions` to Pinia's `DefineStoreOptionsBase` type through declaration merging.
 - The $reset method is available for stores augmented by the plugin (also setup store 😁).
-- When using IndexedDB, the persister stores objects with a `storeName` key path.
+- With IndexedDB, `databaseName` identifies the application database, `objectStoreName` identifies the persisted record collection, and `persistenceKey` (or `$id`) identifies each record.
 
 ---
 
