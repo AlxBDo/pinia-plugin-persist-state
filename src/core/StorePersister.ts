@@ -107,12 +107,12 @@ export default class StorePersister extends Store {
         this.store.hydrate = this.hydrate.bind(this)
     }
 
-    private async cryptProperty(crypt: Crypt, value: string, decrypt: boolean = false): Promise<string> {
-        if (decrypt) {
-            return await crypt.decrypt(value)
-        } else {
-            return await crypt.encrypt(value)
-        }
+    private async decryptProperty<T>(crypt: Crypt, encryptedValue: string): Promise<T> {
+        return crypt.decrypt<T>(encryptedValue)
+    }
+
+    private async encryptProperty(crypt: Crypt, value: unknown): Promise<string> {
+        return crypt.encrypt(value)
     }
 
     async cryptState(state: StateTree, decrypt: boolean = false): Promise<StateTree> {
@@ -134,7 +134,9 @@ export default class StorePersister extends Store {
                     const value = this.getValue(state[property])
 
                     if (value) {
-                        encryptedState[property] = await this.cryptProperty(Crypt, value, decrypt)
+                        encryptedState[property] = decrypt
+                            ? await this.decryptProperty(Crypt, value as string)
+                            : await this.encryptProperty(Crypt, value)
                     }
                 }
 
@@ -265,7 +267,7 @@ export default class StorePersister extends Store {
 
                 if (!isEmpty(stateValue)) {
                     if (hasPropertiesToEncrypt && this._propertiesToEncrypt.has(key)) {
-                        newState[key] = await this.cryptProperty(crypt, stateValue, false)
+                        newState[key] = await this.encryptProperty(crypt, stateValue)
                     } else {
                         newState[key] = toRaw(stateValue)
                     }

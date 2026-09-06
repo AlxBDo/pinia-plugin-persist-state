@@ -134,7 +134,9 @@ Note: encrypted properties are automatically decrypted when remembered (if a cry
 ## 🔐 Encryption
 
 Optionally supply a `cryptKey` when creating the plugin, e.g. `createPersistStatePlugin({ storage: 'localStorage', cryptKey: 'my-secret' })`.
-The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties listed in `persistedPropertiesToEncrypt` on each store. Only the specified properties will be encrypted.
+The plugin uses the Web Crypto API (PBKDF2 + AES-GCM) to encrypt properties listed in `persistedPropertiesToEncrypt` on each store. Only the specified properties will be encrypted. New encrypted values use a versioned `v1:salt:iv:ciphertext` format with a random salt and IV for every value; records in the previous `iv:ciphertext` format remain readable.
+
+The storage adapter remains responsible for serializing the persisted record: Window Storage uses JSON and IndexedDB stores native values. Encryption encodes only the selected value and restores its JSON type (string, number, boolean, array, or object). Encrypted values must be JSON-serializable; functions, symbols, `undefined`, cyclic objects, and `BigInt` are not supported.
 
 --- 
 
