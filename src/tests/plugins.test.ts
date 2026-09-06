@@ -55,6 +55,16 @@ describe('Plugins unit tests', () => {
             expect(PersistPiniaState.pluginOptions.watchedStore).toBeInstanceOf(Set)
         })
 
+        it('creates an IndexedDB persister from explicit options', () => {
+            createPersistStatePlugin({
+                storage: 'indexedDB',
+                databaseName: 'testIndexedDB',
+                objectStoreName: 'persistedStore'
+            })
+
+            expect(PersistPiniaState.pluginOptions.persister?.dbName).toBe('testIndexedDB')
+        })
+
         it('returns empty options when window is undefined', () => {
             const originalWindow = (globalThis as any).window
             delete (globalThis as any).window

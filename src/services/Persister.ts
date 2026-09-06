@@ -1,11 +1,14 @@
 import WindowStorage from './WindowStorage'
 import { AllowedKeyPath, ClientStorage, StorageItem } from '../types/storage'
+import type { PersistStorage } from '../types/store'
 import IndexedDB from './IndexedDB'
-import { PluginConsole } from '../utils/pluginConsole'
 
 export type DbOptions = {
+    databaseName?: string
     keyPath?: AllowedKeyPath
     name: string
+    objectStoreName?: string
+    storage?: PersistStorage
 }
 
 export default class Persister {
@@ -26,47 +29,29 @@ export default class Persister {
     }
 
     defineDb(): ClientStorage {
-        const { keyPath, name } = this._db_options
+        const { databaseName, keyPath, name, objectStoreName, storage } = this._db_options
+        const storageName = storage ?? (name === 'localStorage' || name === 'sessionStorage' ? name : 'indexedDB')
 
-        if (name === 'localStorage' || name === 'sessionStorage') {
-            return new WindowStorage(name)
+        if (storageName === 'localStorage' || storageName === 'sessionStorage') {
+            return new WindowStorage(storageName)
         }
 
-        return new IndexedDB(name, { keyPath })
+        return new IndexedDB(databaseName ?? name, objectStoreName ?? 'persistedStore', { keyPath })
     }
 
-    getItem(itemKey: string): Promise<StorageItem | undefined> {
-        return new Promise((resolve, reject) => {
-            try {
-                return this._db.getItem(itemKey).then(item => resolve(item))
-            } catch (e) {
-                reject(e)
-            }
-        })
+    async getItem(itemKey: string): Promise<StorageItem | undefined> {
+        return this._db.getItem(itemKey)
     }
 
-    removeItem(itemKey: string) {
-        this._db.removeItem(itemKey)
+    async removeItem(itemKey: string): Promise<void> {
+        await this._db.removeItem(itemKey)
     }
 
-
-    setItem(key: string, item: any) {
+    async setItem(key: string, item: StorageItem): Promise<void> {
         if (this._db instanceof IndexedDB) {
-            try {
-                this._db.getItem(key).then(persistedItem => {
-                    if (persistedItem) {
-                        const db = this._db as IndexedDB
-                        db.updateItem(persistedItem)
-                    } else {
-                        this._db.setItem({ storeName: key, ...item })
-                    }
-                })
-            } catch (e) {
-                PluginConsole.error('Persister - setItem Error', e)
-                this._db.setItem({ storename: key, ...item })
-            }
+            await this._db.setItem({ storeName: key, ...(item as object) })
         } else {
-            this._db.setItem(item, key)
+            await this._db.setItem(item, key)
         }
     }
 }

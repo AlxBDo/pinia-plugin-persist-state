@@ -6,6 +6,7 @@ import { beforeEachPiniaPlugin } from './utils/beforeEach'
 import StorePersister from '../core/StorePersister'
 import PersisterMock from '../testing/mocks/persister'
 import Crypt from '../services/Crypt'
+import PersistPiniaState from '../plugins/PersistPiniaState'
 
 // Register the pinia setup for each test (without the plugin integration)
 beforeEachPiniaPlugin()
@@ -86,6 +87,68 @@ describe('StorePersister - basic behaviors', () => {
         expect(store.myStringEncrypted).toBe('Sensitive Data')
     })
 
+    it('uses persistenceKey instead of the Pinia store id', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        storePersister.options.persistenceKey = 'lists'
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.any(Object))
+    })
+
+    it('wraps persisted state with cache metadata only when cache is configured', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        storePersister.options.cache = { version: 2 }
+        storePersister.options.persistenceKey = 'lists'
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.objectContaining({
+            state: expect.any(Object),
+            metadata: expect.objectContaining({ cachedAt: expect.any(Number), version: 2 })
+        }))
+    })
+
+    it('transforms the filtered state before persistence', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const persistedStore = (storePersister as any).store
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        persistedStore.$patch({ nullableValue: null })
+        storePersister.options.cache = undefined
+        storePersister.options.persistenceKey = 'lists'
+        storePersister.options.transformState = (state: Record<string, unknown>) => ({
+            ...state,
+            schemaVersion: 1
+        })
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.objectContaining({ schemaVersion: 1 }))
+        expect(setItem).not.toHaveBeenCalledWith('lists', expect.objectContaining({ nullableValue: null }))
+    })
+
+    it('ignores an expired cache record when configured', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        storePersister.options.cache = { maxAge: 1, onExpired: 'ignore' }
+        storePersister.options.persistenceKey = 'lists'
+        vi.spyOn(persister, 'getItem').mockResolvedValue({
+            state: { myString: 'expired value' },
+            metadata: { cachedAt: Date.now() - 2 }
+        })
+
+        await expect(storePersister.getPersistedState()).resolves.toBeUndefined()
+    })
+
     it('stopWatch stops persisting on mutations', async () => {
         const store = useTestStore()
 
@@ -114,12 +177,36 @@ describe('StorePersister - basic behaviors', () => {
 
         // Change and then remove persisted state
         store.myString = 'Changed locally'
-            ; (store as any).removePersistedState()
+        await (store as any).removePersistedState()
 
         // Remember should not overwrite local change because persisted item was removed
         await (store as any).remember()
 
         expect(store.myString).toBe('Changed locally')
+    })
+
+    it('debounces rapid mutation persistence', async () => {
+        vi.useFakeTimers()
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+
+        try {
+            expect(storePersister).toBeDefined()
+            storePersister.options.watchMutation = true
+            const persist = vi.spyOn(storePersister, 'persist').mockResolvedValue(undefined)
+            const persistedStore = (storePersister as any).store
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+                ; (storePersister as any).storeSubscription({ type: 'direct', storeId: persistedStore.$id })
+
+            await vi.advanceTimersByTimeAsync(199)
+            expect(persist).not.toHaveBeenCalled()
+
+            await vi.advanceTimersByTimeAsync(1)
+            expect(persist).toHaveBeenCalledTimes(1)
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
     it('handles storeSubscription mutation execution and mutationCallback', async () => {

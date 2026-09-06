@@ -4,7 +4,15 @@ import Persister from "../services/Persister"
 import { AnyObject, Console, CustomConsole, isEmpty, Store } from "pinia-plugin-subscription"
 
 import type { Store as PiniaStore, StateTree, SubscriptionCallbackMutation } from "pinia"
-import type { PluginPersistedStoreOptions } from "../types/store"
+import type { PersistedCacheOptions, PersistedStoreOptions, PluginPersistedStoreOptions } from "../types/store"
+
+type CachedState = {
+    metadata: {
+        cachedAt: number
+        version?: number
+    }
+    state: StateTree
+}
 
 const notPersistedProperties: string[] = [
     '@context',
@@ -19,6 +27,7 @@ const notPersistedProperties: string[] = [
     'version'
 ]
 
+const DEFAULT_DEBOUNCE_MS = 200
 
 export default class StorePersister extends Store {
     protected _className: string = 'StorePersister'
@@ -30,6 +39,12 @@ export default class StorePersister extends Store {
     protected _persister?: Persister
 
     private _propertiesToEncrypt: Set<string>
+
+    private _persistenceVersion = 0
+
+    private _persistTimer?: ReturnType<typeof setTimeout>
+
+    private _writeQueue: Promise<void> = Promise.resolve()
 
     private _watchedStore: Set<string>
 
@@ -84,6 +99,7 @@ export default class StorePersister extends Store {
 
         // Augment Store
         this.store.persistState = async () => await this.persist()
+        this.store.flushPersistedState = async () => await this.flushPersistedState()
         this.store.remember = async () => await this.remember()
         this.store.removePersistedState = this.removePersistedState.bind(this)
         this.store.watch = this.watch.bind(this)
@@ -91,12 +107,12 @@ export default class StorePersister extends Store {
         this.store.hydrate = this.hydrate.bind(this)
     }
 
-    private async cryptProperty(crypt: Crypt, value: string, decrypt: boolean = false): Promise<string> {
-        if (decrypt) {
-            return await crypt.decrypt(value)
-        } else {
-            return await crypt.encrypt(value)
-        }
+    private async decryptProperty<T>(crypt: Crypt, encryptedValue: string): Promise<T> {
+        return crypt.decrypt<T>(encryptedValue)
+    }
+
+    private async encryptProperty(crypt: Crypt, value: unknown): Promise<string> {
+        return crypt.encrypt(value)
     }
 
     async cryptState(state: StateTree, decrypt: boolean = false): Promise<StateTree> {
@@ -118,7 +134,9 @@ export default class StorePersister extends Store {
                     const value = this.getValue(state[property])
 
                     if (value) {
-                        encryptedState[property] = await this.cryptProperty(Crypt, value, decrypt)
+                        encryptedState[property] = decrypt
+                            ? await this.decryptProperty(Crypt, value as string)
+                            : await this.encryptProperty(Crypt, value)
                     }
                 }
 
@@ -146,9 +164,20 @@ export default class StorePersister extends Store {
     }
 
     private definePersister(pluginPersister: Persister) {
-        this._persister = this.options.dbName
-            ? new Persister({ name: this.options.dbName as string, keyPath: 'storeName' })
-            : pluginPersister
+        const options = this.getPersistedStoreOptions()
+        if (!options.storage || options.storage === options.storageOptions?.storage) {
+            this._persister = pluginPersister
+            return
+        }
+
+        const storageOptions = options.storageOptions
+        this._persister = new Persister({
+            name: storageOptions?.databaseName ?? options.storage,
+            storage: options.storage,
+            databaseName: storageOptions?.databaseName,
+            objectStoreName: storageOptions?.objectStoreName,
+            keyPath: 'storeName'
+        })
     }
 
     private isEncrypted() {
@@ -159,23 +188,68 @@ export default class StorePersister extends Store {
         return (this.options?.persistedPropertiesToEncrypt ?? []) as string[]
     }
 
+    private getPersistenceKey(): string {
+        return this.getPersistedStoreOptions().persistenceKey ?? this.store.$id
+    }
+
+    private getCacheOptions(): PersistedCacheOptions | undefined {
+        return this.getPersistedStoreOptions().cache
+    }
+
+    private transformState(state: StateTree): StateTree {
+        return this.getPersistedStoreOptions().transformState?.(state) ?? state
+    }
+
+    private getPersistedStoreOptions(): PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'> {
+        return this.options as unknown as PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'>
+    }
+
     async getPersistedState(decrypt: boolean = true): Promise<StateTree | undefined> {
-        const storeName = this.store.$id
+        const persistenceKey = this.getPersistenceKey()
 
         try {
-            let persistedState = await (this._persister as Persister).getItem(storeName) as StateTree
+            let persistedState = await (this._persister as Persister).getItem(persistenceKey) as StateTree | CachedState
+            const cachedState = this.getCachedState(persistedState)
+
+            if (cachedState) {
+                if (await this.shouldIgnoreCachedState(cachedState, persistenceKey)) {
+                    return undefined
+                }
+                persistedState = cachedState.state
+            }
 
             if (decrypt && this.toBeCrypted() && persistedState) {
                 await this._crypt?.init()
-                persistedState = await this.cryptState(persistedState, true)
+                persistedState = await this.cryptState(persistedState as StateTree, true)
             }
 
-            this.debugLog(`getPersistedState ${storeName}`, { persistedState, state: this.state })
+            this.debugLog(`getPersistedState ${persistenceKey}`, { persistedState, state: this.state })
 
-            return persistedState
+            return persistedState as StateTree | undefined
         } catch (e) {
-            this.logError('getPersistedState()', { storeName, e })
+            this.logError('getPersistedState()', { persistenceKey, e })
         }
+    }
+
+    private getCachedState(state: StateTree | CachedState | undefined): CachedState | undefined {
+        return this.getCacheOptions() && state && 'state' in state && 'metadata' in state
+            ? state as CachedState
+            : undefined
+    }
+
+    private async shouldIgnoreCachedState(cachedState: CachedState, persistenceKey: string): Promise<boolean> {
+        const cache = this.getCacheOptions() as PersistedCacheOptions
+        const expired = cache.maxAge !== undefined && cachedState.metadata.cachedAt + cache.maxAge < Date.now()
+        const versionMismatch = cache.version !== undefined && cache.version !== cachedState.metadata.version
+        const action = expired ? cache.onExpired : versionMismatch ? cache.onVersionMismatch : undefined
+
+        if (!action || action === 'restore') {
+            return false
+        }
+        if (action === 'remove') {
+            await (this._persister as Persister).removeItem(persistenceKey)
+        }
+        return true
     }
 
     private async getStateToPersist() {
@@ -197,7 +271,7 @@ export default class StorePersister extends Store {
 
                 if (!isEmpty(stateValue)) {
                     if (hasPropertiesToEncrypt && this._propertiesToEncrypt.has(key)) {
-                        newState[key] = await this.cryptProperty(crypt, stateValue, false)
+                        newState[key] = await this.encryptProperty(crypt, stateValue)
                     } else {
                         newState[key] = toRaw(stateValue)
                     }
@@ -206,11 +280,15 @@ export default class StorePersister extends Store {
 
         }
 
-        return newState
+        return this.transformState(newState)
     }
 
     private getWatchMutation() {
         return this.options.watchMutation
+    }
+
+    private getDebounceMs(): number {
+        return Math.max(0, (this.options.debounceMs ?? DEFAULT_DEBOUNCE_MS) as number)
     }
 
     protected static override hasRequiredKeys(options: AnyObject): boolean {
@@ -224,13 +302,27 @@ export default class StorePersister extends Store {
         ])
     }
 
-    async persist() {
+    async persist(): Promise<void> {
+        const persistenceVersion = ++this._persistenceVersion
         const state = await this.getStateToPersist()
 
         this.debugLog(`persist() ${this.store.$id} - stateToPersist:`, { state })
 
         if (!isEmpty(state)) {
-            (this._persister as Persister).setItem(this.store.$id, state)
+            const cache = this.getCacheOptions()
+            const stateToPersist: StateTree | CachedState = cache
+                ? { state, metadata: { cachedAt: Date.now(), version: cache.version } }
+                : state
+            const write = this._writeQueue.then(async () => {
+                if (persistenceVersion !== this._persistenceVersion) {
+                    return
+                }
+
+                await (this._persister as Persister).setItem(this.getPersistenceKey(), stateToPersist)
+            })
+
+            this._writeQueue = write.catch(() => undefined)
+            await write
         }
     }
 
@@ -253,8 +345,16 @@ export default class StorePersister extends Store {
         })
     }
 
-    private removePersistedState() {
-        (this._persister as Persister).removeItem(this.store.$id)
+    private async removePersistedState(): Promise<void> {
+        this.cancelScheduledPersist()
+        ++this._persistenceVersion
+
+        const removal = this._writeQueue.then(async () => {
+            await (this._persister as Persister).removeItem(this.getPersistenceKey())
+        })
+
+        this._writeQueue = removal.catch(() => undefined)
+        await removal
     }
 
     private stopWatch() {
@@ -277,12 +377,31 @@ export default class StorePersister extends Store {
         ])
 
         if (mutation.type !== 'patch object' && this.getWatchMutation()) {
-            this.persist().then(() => {
-                if (this.store.mutationCallback) {
-                    this.store.mutationCallback(this.state, mutation)
-                }
-            })
+            this.schedulePersist(mutation)
         }
+    }
+
+    private cancelScheduledPersist(): void {
+        if (this._persistTimer) {
+            clearTimeout(this._persistTimer)
+            this._persistTimer = undefined
+        }
+    }
+
+    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): void {
+        this.cancelScheduledPersist()
+
+        this._persistTimer = setTimeout(() => {
+            this._persistTimer = undefined
+            this.persist()
+                .then(() => this.store.mutationCallback?.(this.state, mutation))
+                .catch((error: unknown) => this.logError('persist()', { error, storeName: this.store.$id }))
+        }, this.getDebounceMs())
+    }
+
+    private async flushPersistedState(): Promise<void> {
+        this.cancelScheduledPersist()
+        await this.persist()
     }
 
     toBeCrypted(): boolean {

@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 const storeOptions = {
-    dbName: 'sessionStorage',
+    storage: 'sessionStorage',
     persist: true,
     persistedPropertiesToEncrypt: ['myStringEncrypted'],
     watchMutation: true

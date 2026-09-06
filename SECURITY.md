@@ -2,7 +2,7 @@
 
 ## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in pinia-plugin-subscription, please do **NOT** open a public GitHub issue. Instead, please email the maintainers privately.
+If you discover a security vulnerability in pinia-plugin-persist-state, please do **NOT** open a public GitHub issue. Instead, please email the maintainers privately.
 
 **Email:** [Security Contact - reach out via GitHub profile]
 
@@ -30,7 +30,7 @@ We will:
 
 ## Security Best Practices
 
-When using pinia-plugin-subscription:
+When using pinia-plugin-persist-state:
 
 1. **Keep Dependencies Updated:** Regularly update Pinia, Vue, and other dependencies to the latest versions
 2. **Review Plugin Code:** Always review subscriber code before using in production
@@ -58,7 +58,7 @@ We monitor these dependencies for vulnerabilities and recommend keeping them upd
 
 This policy covers:
 
-- ✅ Code in the pinia-plugin-subscription repository
+- ✅ Code in the pinia-plugin-persist-state repository
 - ✅ Published npm packages
 - ✅ Security of the plugin API
 
@@ -72,4 +72,4 @@ This policy does NOT cover:
 
 For general security questions or concerns, open a private security advisory on GitHub.
 
-Thank you for helping keep pinia-plugin-subscription secure! 🔒
+Thank you for helping keep pinia-plugin-persist-state secure! 🔒
