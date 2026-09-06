@@ -196,6 +196,10 @@ export default class StorePersister extends Store {
         return this.getPersistedStoreOptions().cache
     }
 
+    private transformState(state: StateTree): StateTree {
+        return this.getPersistedStoreOptions().transformState?.(state) ?? state
+    }
+
     private getPersistedStoreOptions(): PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'> {
         return this.options as unknown as PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'>
     }
@@ -276,7 +280,7 @@ export default class StorePersister extends Store {
 
         }
 
-        return newState
+        return this.transformState(newState)
     }
 
     private getWatchMutation() {

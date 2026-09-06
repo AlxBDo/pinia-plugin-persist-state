@@ -20,7 +20,7 @@ A small Pinia plugin that adds persistence and optional encryption to your Pinia
 Install the package (example):
 
 ```bash
-npm install --save persist-pinia-state
+npm install --save pinia-plugin-persist-state
 ```
 
 Then register the plugin with Pinia in your app entry (see `src/main.ts`):
@@ -29,7 +29,7 @@ Then register the plugin with Pinia in your app entry (see `src/main.ts`):
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createPlugin } from 'pinia-plugin-subscription'
-import { createPersistStatePlugin, PLUGIN_NAME } from 'persist-pinia-state'
+import { createPersistStatePlugin, PLUGIN_NAME } from 'pinia-plugin-persist-state'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -50,7 +50,7 @@ For Nuxt/SSR projects, prefer `createHydrationPlugin` from `pinia-plugin-subscri
 
 ```ts
 import { createHydrationPlugin } from 'pinia-plugin-subscription'
-import { createPersistStatePlugin } from 'persist-pinia-state'
+import { createPersistStatePlugin } from 'pinia-plugin-persist-state'
 
 pinia.use(createHydrationPlugin([
   createPersistStatePlugin({ storage: 'localStorage', cryptKey: 'my-secret-key' })
@@ -109,10 +109,13 @@ Fields available when setting `storeOptions`:
 - `excludedKeys?: string[]` — List of state properties that should NOT be persisted.
 - `persist?: boolean` — Enable or disable persistence for the store (default: `false`).
 - `persistedPropertiesToEncrypt?: string[]` — List of property names to be encrypted when persisted.
+- `transformState?: (state) => state` — Optional synchronous transformer applied to the filtered snapshot after selected properties are encrypted and before storage. Use it to convert application-specific values into a persistent representation.
 - `watchMutation?: boolean` — When `true`, plugin watches store mutations and automatically persists changes.
 - `debounceMs?: number` — Delay in milliseconds before an automatic persistence is written. Defaults to `200`; use `0` to persist each mutation immediately.
 
 `CacheOptions` supports `maxAge?: number`, `version?: number`, `onExpired?: 'ignore' | 'remove' | 'restore'`, and `onVersionMismatch?: 'ignore' | 'remove' | 'restore'`. Cache metadata is written only when `cache` is configured.
+
+`null` and `undefined` state values are intentionally omitted from persisted snapshots. Empty values handled by `pinia-plugin-subscription` are also omitted. `transformState` receives the resulting snapshot and must return the representation to persist; it must not mutate the store state. A transformer only changes the written representation, so use values that can be restored directly by the store or handle reconstruction in the store hydration flow.
 
 ---
 

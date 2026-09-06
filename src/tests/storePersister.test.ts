@@ -115,6 +115,26 @@ describe('StorePersister - basic behaviors', () => {
         }))
     })
 
+    it('transforms the filtered state before persistence', async () => {
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        const persister = (storePersister as any)._persister
+        const persistedStore = (storePersister as any).store
+        const setItem = vi.spyOn(persister, 'setItem').mockResolvedValue(undefined)
+        persistedStore.$patch({ nullableValue: null })
+        storePersister.options.cache = undefined
+        storePersister.options.persistenceKey = 'lists'
+        storePersister.options.transformState = (state: Record<string, unknown>) => ({
+            ...state,
+            schemaVersion: 1
+        })
+
+        await storePersister.persist()
+
+        expect(setItem).toHaveBeenCalledWith('lists', expect.objectContaining({ schemaVersion: 1 }))
+        expect(setItem).not.toHaveBeenCalledWith('lists', expect.objectContaining({ nullableValue: null }))
+    })
+
     it('ignores an expired cache record when configured', async () => {
         useTestStore()
         const storePersister = (PersistPiniaState as any).storeInstance as StorePersister

@@ -5,6 +5,7 @@ export type {
     PersistedCacheOptions,
     PersistedStore,
     PersistedStoreOptions,
+    PersistedStateTransformer,
     PersistStatePluginOptions,
     PersistStorage,
     PluginPersistedStoreOptions,

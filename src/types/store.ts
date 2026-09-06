@@ -1,5 +1,6 @@
 import Crypt from "../services/Crypt";
 import Persister from "../services/Persister";
+import type { StateTree } from "pinia";
 
 
 export interface PersistedState {
@@ -32,6 +33,8 @@ export interface PersistedCacheOptions {
     version?: number
 }
 
+export type PersistedStateTransformer = (state: StateTree) => StateTree
+
 export interface PersistedStoreOptions {
     cache?: PersistedCacheOptions
     debounceMs?: number
@@ -41,6 +44,7 @@ export interface PersistedStoreOptions {
     persistenceKey?: string
     persistedPropertiesToEncrypt?: string[]
     storage?: PersistStorage
+    transformState?: PersistedStateTransformer
     watchMutation?: boolean
 }
 
