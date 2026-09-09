@@ -52,6 +52,43 @@ describe('StorePersister - basic behaviors', () => {
         }
     })
 
+    it('restores persisted state during hydration when restoreOnHydrate is enabled', async () => {
+        const originalWindow = (globalThis as any).window
+            ; (globalThis as any).window = globalThis
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        storePersister.options.restoreOnHydrate = false
+        await nextTick()
+        const remember = vi.spyOn(storePersister as any, 'remember').mockResolvedValue(undefined)
+        storePersister.options.restoreOnHydrate = true
+
+        try {
+            await storePersister.hydrate()
+
+            expect(remember).toHaveBeenCalledOnce()
+        } finally {
+            ; (globalThis as any).window = originalWindow
+        }
+    })
+
+    it('does not restore persisted state during hydration when restoreOnHydrate is disabled', async () => {
+        const originalWindow = (globalThis as any).window
+            ; (globalThis as any).window = globalThis
+        useTestStore()
+        const storePersister = (PersistPiniaState as any).storeInstance as StorePersister
+        storePersister.options.restoreOnHydrate = false
+        await nextTick()
+        const remember = vi.spyOn(storePersister as any, 'remember').mockResolvedValue(undefined)
+
+        try {
+            await storePersister.hydrate()
+
+            expect(remember).not.toHaveBeenCalled()
+        } finally {
+            ; (globalThis as any).window = originalWindow
+        }
+    })
+
     it('customizeStore enables persist option when watchMutation is true without persist', () => {
         const options: any = {
             storeOptions: { watchMutation: true },

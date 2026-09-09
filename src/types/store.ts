@@ -43,6 +43,7 @@ export interface PersistedStoreOptions {
     persist?: boolean
     persistenceKey?: string
     persistedPropertiesToEncrypt?: string[]
+    restoreOnHydrate?: boolean
     storage?: PersistStorage
     transformState?: PersistedStateTransformer
     watchMutation?: boolean

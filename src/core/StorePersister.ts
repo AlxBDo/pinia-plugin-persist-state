@@ -31,21 +31,13 @@ const DEFAULT_DEBOUNCE_MS = 200
 
 export default class StorePersister extends Store {
     protected _className: string = 'StorePersister'
-
     protected _crypt?: Crypt
-
     private _excludedKeys: Set<string>
-
     protected _persister?: Persister
-
     private _propertiesToEncrypt: Set<string>
-
     private _persistenceVersion = 0
-
     private _persistTimer?: ReturnType<typeof setTimeout>
-
     private _writeQueue: Promise<void> = Promise.resolve()
-
     private _watchedStore: Set<string>
 
 
@@ -80,16 +72,8 @@ export default class StorePersister extends Store {
         }
     }
 
-    override hydrate(): Promise<void> {
-        if (typeof window === 'undefined') {
-            return Promise.resolve()
-        }
 
-        return this.remember()
-    }
-
-
-    augmentStore() {
+    private augmentStore() {
         const { isEncrypted, persistedPropertiesToEncrypt, watchMutation } = this.options
         if (isEncrypted === undefined) { this.options.isEncrypted = false }
         if (persistedPropertiesToEncrypt === undefined) { this.options.persistedPropertiesToEncrypt = [] }
@@ -107,12 +91,11 @@ export default class StorePersister extends Store {
         this.store.hydrate = this.hydrate.bind(this)
     }
 
-    private async decryptProperty<T>(crypt: Crypt, encryptedValue: string): Promise<T> {
-        return crypt.decrypt<T>(encryptedValue)
-    }
-
-    private async encryptProperty(crypt: Crypt, value: unknown): Promise<string> {
-        return crypt.encrypt(value)
+    private cancelScheduledPersist(): void {
+        if (this._persistTimer) {
+            clearTimeout(this._persistTimer)
+            this._persistTimer = undefined
+        }
     }
 
     async cryptState(state: StateTree, decrypt: boolean = false): Promise<StateTree> {
@@ -163,6 +146,10 @@ export default class StorePersister extends Store {
         return super.customizeStore<Instance>(store, options, debug, console)
     }
 
+    private async decryptProperty<T>(crypt: Crypt, encryptedValue: string): Promise<T> {
+        return crypt.decrypt<T>(encryptedValue)
+    }
+
     private definePersister(pluginPersister: Persister) {
         const options = this.getPersistedStoreOptions()
         if (!options.storage || options.storage === options.storageOptions?.storage) {
@@ -180,8 +167,13 @@ export default class StorePersister extends Store {
         })
     }
 
-    private isEncrypted() {
-        return this.options.isEncrypted
+    private async encryptProperty(crypt: Crypt, value: unknown): Promise<string> {
+        return crypt.encrypt(value)
+    }
+
+    private async flushPersistedState(): Promise<void> {
+        this.cancelScheduledPersist()
+        await this.persist()
     }
 
     private getPropertiesToEncrypt(): string[] {
@@ -192,19 +184,21 @@ export default class StorePersister extends Store {
         return this.getPersistedStoreOptions().persistenceKey ?? this.store.$id
     }
 
-    private getCacheOptions(): PersistedCacheOptions | undefined {
-        return this.getPersistedStoreOptions().cache
+    private getCachedState(state: StateTree | CachedState | undefined): CachedState | undefined {
+        return this.getCacheOptions() && state && 'state' in state && 'metadata' in state
+            ? state as CachedState
+            : undefined
     }
 
-    private transformState(state: StateTree): StateTree {
-        return this.getPersistedStoreOptions().transformState?.(state) ?? state
+    private getCacheOptions(): PersistedCacheOptions | undefined {
+        return this.getPersistedStoreOptions().cache
     }
 
     private getPersistedStoreOptions(): PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'> {
         return this.options as unknown as PersistedStoreOptions & Pick<PluginPersistedStoreOptions, 'storageOptions'>
     }
 
-    async getPersistedState(decrypt: boolean = true): Promise<StateTree | undefined> {
+    private async getPersistedState(decrypt: boolean = true): Promise<StateTree | undefined> {
         const persistenceKey = this.getPersistenceKey()
 
         try {
@@ -229,27 +223,6 @@ export default class StorePersister extends Store {
         } catch (e) {
             this.logError('getPersistedState()', { persistenceKey, e })
         }
-    }
-
-    private getCachedState(state: StateTree | CachedState | undefined): CachedState | undefined {
-        return this.getCacheOptions() && state && 'state' in state && 'metadata' in state
-            ? state as CachedState
-            : undefined
-    }
-
-    private async shouldIgnoreCachedState(cachedState: CachedState, persistenceKey: string): Promise<boolean> {
-        const cache = this.getCacheOptions() as PersistedCacheOptions
-        const expired = cache.maxAge !== undefined && cachedState.metadata.cachedAt + cache.maxAge < Date.now()
-        const versionMismatch = cache.version !== undefined && cache.version !== cachedState.metadata.version
-        const action = expired ? cache.onExpired : versionMismatch ? cache.onVersionMismatch : undefined
-
-        if (!action || action === 'restore') {
-            return false
-        }
-        if (action === 'remove') {
-            await (this._persister as Persister).removeItem(persistenceKey)
-        }
-        return true
     }
 
     private async getStateToPersist() {
@@ -295,6 +268,14 @@ export default class StorePersister extends Store {
         return !!options?.persist || !!options?.watchMutation
     }
 
+    override hydrate(): Promise<void> {
+        if (typeof window === 'undefined' || !this.shouldRestoreOnHydrate()) {
+            return Promise.resolve()
+        }
+
+        return this.remember()
+    }
+
     private initExcludedKeys(): Set<string> {
         return new Set<string>([
             ...notPersistedProperties,
@@ -302,7 +283,11 @@ export default class StorePersister extends Store {
         ])
     }
 
-    async persist(): Promise<void> {
+    private isEncrypted() {
+        return this.options.isEncrypted
+    }
+
+    private async persist(): Promise<void> {
         const persistenceVersion = ++this._persistenceVersion
         const state = await this.getStateToPersist()
 
@@ -326,23 +311,20 @@ export default class StorePersister extends Store {
         }
     }
 
-    propertyShouldBePersisted(property: string): boolean {
-        return !this._excludedKeys.has(property)
-    }
-
     private async remember(): Promise<void> {
         this.state.isLoading = true
-        return new Promise(async (resolve) => {
+
+        try {
             let persistedState = await this.getPersistedState()
 
             if (persistedState && !isEmpty(persistedState)) {
                 this.store.$patch(persistedState)
             }
-
+        } catch (error) {
+            this.logError('remember()', { error, storeName: this.store.$id })
+        } finally {
             this.state.isLoading = false
-
-            return resolve()
-        })
+        }
     }
 
     private async removePersistedState(): Promise<void> {
@@ -355,6 +337,36 @@ export default class StorePersister extends Store {
 
         this._writeQueue = removal.catch(() => undefined)
         await removal
+    }
+
+    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): void {
+        this.cancelScheduledPersist()
+
+        this._persistTimer = setTimeout(() => {
+            this._persistTimer = undefined
+            this.persist()
+                .then(() => this.store.mutationCallback?.(this.state, mutation))
+                .catch((error: unknown) => this.logError('persist()', { error, storeName: this.store.$id }))
+        }, this.getDebounceMs())
+    }
+
+    private async shouldIgnoreCachedState(cachedState: CachedState, persistenceKey: string): Promise<boolean> {
+        const cache = this.getCacheOptions() as PersistedCacheOptions
+        const expired = cache.maxAge !== undefined && cachedState.metadata.cachedAt + cache.maxAge < Date.now()
+        const versionMismatch = cache.version !== undefined && cache.version !== cachedState.metadata.version
+        const action = expired ? cache.onExpired : versionMismatch ? cache.onVersionMismatch : undefined
+
+        if (!action || action === 'restore') {
+            return false
+        }
+        if (action === 'remove') {
+            await (this._persister as Persister).removeItem(persistenceKey)
+        }
+        return true
+    }
+
+    private shouldRestoreOnHydrate(): boolean {
+        return this.options.restoreOnHydrate === true
     }
 
     private stopWatch() {
@@ -381,35 +393,16 @@ export default class StorePersister extends Store {
         }
     }
 
-    private cancelScheduledPersist(): void {
-        if (this._persistTimer) {
-            clearTimeout(this._persistTimer)
-            this._persistTimer = undefined
-        }
-    }
-
-    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): void {
-        this.cancelScheduledPersist()
-
-        this._persistTimer = setTimeout(() => {
-            this._persistTimer = undefined
-            this.persist()
-                .then(() => this.store.mutationCallback?.(this.state, mutation))
-                .catch((error: unknown) => this.logError('persist()', { error, storeName: this.store.$id }))
-        }, this.getDebounceMs())
-    }
-
-    private async flushPersistedState(): Promise<void> {
-        this.cancelScheduledPersist()
-        await this.persist()
-    }
-
-    toBeCrypted(): boolean {
+    private toBeCrypted(): boolean {
         return !!(this._crypt && this.getPropertiesToEncrypt())
     }
 
-    toBeWatched(): boolean {
+    private toBeWatched(): boolean {
         return !this._watchedStore.has(this.store.$id)
+    }
+
+    private transformState(state: StateTree): StateTree {
+        return this.getPersistedStoreOptions().transformState?.(state) ?? state
     }
 
     private watch(): void {

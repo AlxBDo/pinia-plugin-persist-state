@@ -4,6 +4,7 @@ import { ref } from "vue";
 const storeOptions = {
     persist: true,
     persistedPropertiesToEncrypt: ['myStringEncrypted'],
+    restoreOnHydrate: true,
     watchMutation: true
 }
 
