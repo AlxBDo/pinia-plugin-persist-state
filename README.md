@@ -112,6 +112,7 @@ Fields available when setting `storeOptions`:
 - `transformState?: (state) => state` — Optional synchronous transformer applied to the filtered snapshot after selected properties are encrypted and before storage. Use it to convert application-specific values into a persistent representation.
 - `watchMutation?: boolean` — When `true`, plugin watches store mutations and automatically persists changes.
 - `debounceMs?: number` — Delay in milliseconds before an automatic persistence is written. Defaults to `200`; use `0` to persist each mutation immediately.
+- `restoreOnHydrate?: boolean` - Set it to true, and the persisted state will be restored to the store.
 
 `CacheOptions` supports `maxAge?: number`, `version?: number`, `onExpired?: 'ignore' | 'remove' | 'restore'`, and `onVersionMismatch?: 'ignore' | 'remove' | 'restore'`. Cache metadata is written only when `cache` is configured.
 

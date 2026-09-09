@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2-beta.0]
+## [0.1.2]
 
 ### Added
 - Added an object-based `createPersistStatePlugin` configuration to explicitly select `storage`, `databaseName`, `objectStoreName`, and `cryptKey`.
 - Added `persistenceKey` to persist a store under a stable or application-specific record key instead of its Pinia `$id`.
 - Added opt-in cache metadata and restore policies through `cache`, including `maxAge`, schema `version`, and expiration/version-mismatch actions.
 - Added `debounceMs` for trailing, per-store automatic persistence; automatic writes use a 200 ms delay by default.
+- Added `restoreOnHydrate` to restore state store on client hydration.
 - Added `flushPersistedState()` to immediately write the latest store state and cancel a pending debounced write.
 - Added `transformState` to convert a filtered snapshot into an application-defined persistent representation before it is stored.
 - Added `fake-indexeddb` integration tests for real IndexedDB updates, connection reuse, selective deletion, database isolation, and transaction errors.
