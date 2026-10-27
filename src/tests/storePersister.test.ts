@@ -100,7 +100,7 @@ describe('StorePersister - basic behaviors', () => {
             $subscribe: vi.fn(),
             $onAction: vi.fn()
         }
-        StorePersister.customizeStore(mockStore, options, false)
+        StorePersister.customizeStore(mockStore, options)
         expect(options.storeOptions.persist).toBe(true)
     })
 

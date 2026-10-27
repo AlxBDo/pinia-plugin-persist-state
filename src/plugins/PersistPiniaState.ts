@@ -1,7 +1,6 @@
 import { nextTick } from "vue";
 import StorePersister from "../core/StorePersister";
-import { PluginSubscriber } from "pinia-plugin-subscription";
-import { PluginConsole } from "../utils/pluginConsole";
+import { PluginSubscriber } from "pinia-plugin-subscription/helpers";
 import { pluginName } from "../utils/constantes";
 import { PersistedStore } from "../types/store";
 import type { Store } from "pinia";
@@ -18,8 +17,7 @@ class PeristPiniaState extends PluginSubscriber<StorePersister> {
     constructor() {
         super(
             pluginName,
-            StorePersister.customizeStore.bind(StorePersister),
-            PluginConsole
+            StorePersister.customizeStore.bind(StorePersister)
         )
 
         this.execution = {
@@ -40,7 +38,7 @@ class PeristPiniaState extends PluginSubscriber<StorePersister> {
         this.hydrationScheduler?.(() => {
             const hydration = this.storeInstance?.hydrate?.()
             if (hydration && typeof (hydration as Promise<void>).catch === 'function') {
-                ; (hydration as Promise<void>).catch((e: unknown) => PluginConsole.error('PersistPiniaState hydration error', e))
+                ; (hydration as Promise<void>).catch((e: unknown) => console.error('PersistPiniaState hydration error', e))
             }
         })
     }

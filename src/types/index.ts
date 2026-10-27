@@ -1,4 +1,4 @@
-import type { PluginSubscriberInterface } from "pinia-plugin-subscription";
+import type { PluginSubscriberInterface } from "pinia-plugin-subscription/types";
 import type { PersistStatePluginOptions } from "./store";
 
 export type {
