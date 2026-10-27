@@ -42,7 +42,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "pinia-plugin-subscription": "^0.1.7"
+    "pinia-plugin-subscription": "^1.0.0-beta.9"
   },
   "peerDependencies": {
     "pinia": "^2.0.0 || ^3.0.0",

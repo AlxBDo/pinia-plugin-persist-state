@@ -1,3 +1,4 @@
+import type { StoreClassConstructorParams } from "pinia-plugin-subscription/types";
 import PersistPiniaState from "../../plugins/PersistPiniaState";
 import Crypt from "../../services/Crypt";
 import PersisterMock from "./persister";
@@ -14,7 +15,7 @@ export function createPluginMock(dbName: string, cryptKey?: string) {
         persister: new PersisterMock({ name: dbName }),
         crypt,
         watchedStore: new Set<string>()
-    }
+    } as unknown as StoreClassConstructorParams
 
     // Return the plugin object itself like createPersistStatePlugin does
     return PersistPiniaState

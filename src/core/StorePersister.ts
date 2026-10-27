@@ -1,7 +1,9 @@
 import { toRaw } from "vue"
 import Crypt from "../services/Crypt"
 import Persister from "../services/Persister"
-import { AnyObject, Console, CustomConsole, isEmpty, Store } from "pinia-plugin-subscription"
+import { isEmpty, Store } from "pinia-plugin-subscription/helpers"
+
+import type { AnyObject, StoreClassConstructorParams } from "pinia-plugin-subscription/types"
 
 import type { Store as PiniaStore, StateTree, SubscriptionCallbackMutation } from "pinia"
 import type { PersistedCacheOptions, PersistedStoreOptions, PluginPersistedStoreOptions } from "../types/store"
@@ -43,11 +45,9 @@ export default class StorePersister extends Store {
 
     constructor(
         store: PiniaStore,
-        options: PluginPersistedStoreOptions,
-        debug: boolean,
-        console?: CustomConsole
+        options: PluginPersistedStoreOptions & StoreClassConstructorParams
     ) {
-        super(store, options, debug, console)
+        super(store, options)
         const { crypt, persister, watchedStore } = options
 
         this._excludedKeys = this.initExcludedKeys()
@@ -62,9 +62,9 @@ export default class StorePersister extends Store {
 
         this.augmentStore()
 
-        this.debugLog('StorePersister constructor', {
+        this.trace('constructor', store.$id, () => ({
             toBeWatched: this.toBeWatched(), watchedStore, persister, store, options
-        })
+        }))
 
         if (this.toBeWatched()) {
             this._watchedStore.add(this.store.$id)
@@ -104,11 +104,11 @@ export default class StorePersister extends Store {
             const persistedPropertiesToEncrypt = this.getPropertiesToEncrypt()
             const isEncrypted = this.isEncrypted()
 
-            this.debugLog(`cryptState - ${this.store.$id} ${decrypt ? 'decrypt' : 'crypt'}`, {
+            this.trace(`cryptState:${decrypt ? 'decrypt' : 'crypt'}`, this.store.$id, () => ({
                 can: this._propertiesToEncrypt.size > 0 && isEncrypted === decrypt && !!Crypt,
                 Crypt,
                 state
-            })
+            }))
 
             if (this._propertiesToEncrypt.size > 0 && Crypt) {
                 const encryptedState = {} as StateTree
@@ -123,7 +123,7 @@ export default class StorePersister extends Store {
                     }
                 }
 
-                this.debugLog(`cryptState - ${this.store.$id}`, { encryptedState })
+                this.trace('cryptState:result', this.store.$id, () => ({ encryptedState }))
 
                 if (!isEmpty(encryptedState)) {
                     state = { ...state, ...encryptedState }
@@ -138,12 +138,12 @@ export default class StorePersister extends Store {
         })
     }
 
-    static override customizeStore<Instance extends Store>(store: PiniaStore, options: AnyObject, debug: boolean, console?: Console): Instance | undefined {
+    static override customizeStore<Instance extends Store>(store: PiniaStore, options: StoreClassConstructorParams): Instance | undefined {
         if (!options.storeOptions?.persist && options.storeOptions?.watchMutation) {
             options.storeOptions.persist = true
         }
 
-        return super.customizeStore<Instance>(store, options, debug, console)
+        return super.customizeStore<Instance>(store, options)
     }
 
     private async decryptProperty<T>(crypt: Crypt, encryptedValue: string): Promise<T> {
@@ -217,11 +217,11 @@ export default class StorePersister extends Store {
                 persistedState = await this.cryptState(persistedState as StateTree, true)
             }
 
-            this.debugLog(`getPersistedState ${persistenceKey}`, { persistedState, state: this.state })
+            this.trace('getPersistedState', this.store.$id, () => ({ persistenceKey, persistedState, state: this.state }))
 
             return persistedState as StateTree | undefined
         } catch (e) {
-            this.logError('getPersistedState()', { persistenceKey, e })
+            this.traceError('getPersistedState', e, this.store.$id, { persistenceKey })
         }
     }
 
@@ -238,7 +238,7 @@ export default class StorePersister extends Store {
         const newState = {} as StateTree
 
         for (const key of Object.keys(state)) {
-            if (!this.hasDeniedFirstChar(key[0]) && !excludedKeys.has(key)) {
+            if (!this.hasDeniedFirstChar(key[0] as string) && !excludedKeys.has(key)) {
 
                 const stateValue = state[key]
 
@@ -291,7 +291,7 @@ export default class StorePersister extends Store {
         const persistenceVersion = ++this._persistenceVersion
         const state = await this.getStateToPersist()
 
-        this.debugLog(`persist() ${this.store.$id} - stateToPersist:`, { state })
+        this.trace('persist', this.store.$id, () => ({ stateToPersist: state }))
 
         if (!isEmpty(state)) {
             const cache = this.getCacheOptions()
@@ -321,7 +321,7 @@ export default class StorePersister extends Store {
                 this.store.$patch(persistedState)
             }
         } catch (error) {
-            this.logError('remember()', { error, storeName: this.store.$id })
+            this.traceError('remember', error, this.store.$id)
         } finally {
             this.state.isLoading = false
         }
@@ -346,7 +346,7 @@ export default class StorePersister extends Store {
             this._persistTimer = undefined
             this.persist()
                 .then(() => this.store.mutationCallback?.(this.state, mutation))
-                .catch((error: unknown) => this.logError('persist()', { error, storeName: this.store.$id }))
+                .catch((error: unknown) => this.traceError('persist', error, this.store.$id))
         }, this.getDebounceMs())
     }
 
@@ -380,13 +380,13 @@ export default class StorePersister extends Store {
     }
 
     private storeSubscription(mutation: SubscriptionCallbackMutation<StateTree>): void {
-        this.debugLog(`store.storeSubscription() ${this.store.$id}`, [
-            'mutation type !== patch object: ', mutation.type !== 'patch object',
-            'watchMutation: ', this.getWatchMutation(),
-            'mutation:', mutation,
-            'state:', this.state,
-            'store:', this.store
-        ])
+        this.trace('storeSubscription', this.store.$id, () => ({
+            isNotPatchObject: mutation.type !== 'patch object',
+            watchMutation: this.getWatchMutation(),
+            mutation,
+            state: this.state,
+            store: this.store
+        }))
 
         if (mutation.type !== 'patch object' && this.getWatchMutation()) {
             this.schedulePersist(mutation)
