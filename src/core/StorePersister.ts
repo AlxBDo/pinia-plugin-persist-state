@@ -1,7 +1,7 @@
 import { toRaw } from "vue"
 import Crypt from "../services/Crypt"
 import Persister from "../services/Persister"
-import { isEmpty, Store } from "pinia-plugin-subscription/helpers"
+import { isEmpty, Store, traceGroups } from "pinia-plugin-subscription/helpers"
 
 import type { AnyObject, StoreClassConstructorParams } from "pinia-plugin-subscription/types"
 
@@ -39,6 +39,7 @@ export default class StorePersister extends Store {
     private _propertiesToEncrypt: Set<string>
     private _persistenceVersion = 0
     private _persistTimer?: ReturnType<typeof setTimeout>
+    private _resolvePendingPersist?: () => void
     private _writeQueue: Promise<void> = Promise.resolve()
     private _watchedStore: Set<string>
 
@@ -63,7 +64,7 @@ export default class StorePersister extends Store {
         this.augmentStore()
 
         this.trace('constructor', store.$id, () => ({
-            toBeWatched: this.toBeWatched(), watchedStore, persister, store, options
+            toBeWatched: this.toBeWatched(), watchedStore, //persister
         }))
 
         if (this.toBeWatched()) {
@@ -96,6 +97,8 @@ export default class StorePersister extends Store {
             clearTimeout(this._persistTimer)
             this._persistTimer = undefined
         }
+        this._resolvePendingPersist?.()
+        this._resolvePendingPersist = undefined
     }
 
     async cryptState(state: StateTree, decrypt: boolean = false): Promise<StateTree> {
@@ -106,8 +109,8 @@ export default class StorePersister extends Store {
 
             this.trace(`cryptState:${decrypt ? 'decrypt' : 'crypt'}`, this.store.$id, () => ({
                 can: this._propertiesToEncrypt.size > 0 && isEncrypted === decrypt && !!Crypt,
-                Crypt,
-                state
+                //Crypt,
+                groupId: traceGroups.onMutation(this.store.$id)
             }))
 
             if (this._propertiesToEncrypt.size > 0 && Crypt) {
@@ -123,7 +126,10 @@ export default class StorePersister extends Store {
                     }
                 }
 
-                this.trace('cryptState:result', this.store.$id, () => ({ encryptedState }))
+                this.trace('cryptState:result', this.store.$id, () => ({
+                    groupId: traceGroups.onMutation(this.store.$id),
+                    //encryptedState
+                }))
 
                 if (!isEmpty(encryptedState)) {
                     state = { ...state, ...encryptedState }
@@ -217,11 +223,18 @@ export default class StorePersister extends Store {
                 persistedState = await this.cryptState(persistedState as StateTree, true)
             }
 
-            this.trace('getPersistedState', this.store.$id, () => ({ persistenceKey, persistedState, state: this.state }))
+            this.trace('getPersistedState', this.store.$id, () => ({
+                groupId: traceGroups.onMutation(this.store.$id),
+                //persistenceKey,
+                //persistedState
+            }))
 
             return persistedState as StateTree | undefined
         } catch (e) {
-            this.traceError('getPersistedState', e, this.store.$id, { persistenceKey })
+            this.traceError('getPersistedState', e, this.store.$id, () => ({
+                groupId: traceGroups.onMutation(this.store.$id),
+                persistenceKey
+            }))
         }
     }
 
@@ -291,7 +304,9 @@ export default class StorePersister extends Store {
         const persistenceVersion = ++this._persistenceVersion
         const state = await this.getStateToPersist()
 
-        this.trace('persist', this.store.$id, () => ({ stateToPersist: state }))
+        this.trace('persist', this.store.$id, () => ({
+            groupId: traceGroups.onMutation(this.store.$id)
+        }))
 
         if (!isEmpty(state)) {
             const cache = this.getCacheOptions()
@@ -339,15 +354,26 @@ export default class StorePersister extends Store {
         await removal
     }
 
-    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): void {
+    private schedulePersist(mutation: SubscriptionCallbackMutation<StateTree>): Promise<void> {
         this.cancelScheduledPersist()
 
-        this._persistTimer = setTimeout(() => {
-            this._persistTimer = undefined
-            this.persist()
-                .then(() => this.store.mutationCallback?.(this.state, mutation))
-                .catch((error: unknown) => this.traceError('persist', error, this.store.$id))
-        }, this.getDebounceMs())
+        return new Promise<void>((resolve) => {
+            this._resolvePendingPersist = resolve
+            this._persistTimer = setTimeout(async () => {
+                this._persistTimer = undefined
+                this._resolvePendingPersist = undefined
+                try {
+                    await this.persist()
+                    this.store.mutationCallback?.(this.state, mutation)
+                } catch (error: unknown) {
+                    this.traceError('persist', error, this.store.$id, () => ({
+                        groupId: traceGroups.onMutation(this.store.$id)
+                    }))
+                } finally {
+                    resolve()
+                }
+            }, this.getDebounceMs())
+        })
     }
 
     private async shouldIgnoreCachedState(cachedState: CachedState, persistenceKey: string): Promise<boolean> {
@@ -379,17 +405,15 @@ export default class StorePersister extends Store {
         }
     }
 
-    private storeSubscription(mutation: SubscriptionCallbackMutation<StateTree>): void {
+    private async storeSubscription(mutation: SubscriptionCallbackMutation<StateTree>): Promise<void> {
         this.trace('storeSubscription', this.store.$id, () => ({
+            groupId: traceGroups.onMutation(this.store.$id),
             isNotPatchObject: mutation.type !== 'patch object',
-            watchMutation: this.getWatchMutation(),
-            mutation,
-            state: this.state,
-            store: this.store
+            watchMutation: this.getWatchMutation()
         }))
 
         if (mutation.type !== 'patch object' && this.getWatchMutation()) {
-            this.schedulePersist(mutation)
+            await this.schedulePersist(mutation)
         }
     }
 
