@@ -1,7 +1,7 @@
 {
   "name": "pinia-plugin-persist-state",
   "description": "Pinia plugin for persisting store state",
-  "version": "0.1.2",
+  "version": "0.1.3-beta.0",
   "type": "module",
   "author": "Alexandre Bidaud <alexbidaud85@gmail.com> (https://github.com/AlxBDo)",
   "license": "MIT",
@@ -56,6 +56,7 @@
     "@vue/tsconfig": "^0.8.1",
     "fake-indexeddb": "^6.2.5",
     "pinia": "^3.0.2",
+    "pinia-plugin-extending-store": "^0.1.6-beta.4",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^4.0.16",
